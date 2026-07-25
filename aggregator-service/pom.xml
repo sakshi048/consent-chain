@@ -6,13 +6,13 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.3.4</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/>
     </parent>
     <groupId>com.consentchain</groupId>
-    <artifactId>bank-service</artifactId>
+    <artifactId>aggregator-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>bank-service</name>
-    <description>bank-service</description>
+    <name>aggregator-service</name>
+    <description>aggregator-service</description>
     <url/>
     <licenses>
         <license/>
@@ -46,7 +46,6 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.34</version>
             <optional>true</optional>
         </dependency>
         <dependency>
