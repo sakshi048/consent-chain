@@ -204,6 +204,78 @@ cd aggregator-service
 
 ---
 
+**Bank Service (mock HDFC/SBI/ICICI) — exact steps:**
+
+1. **Naya Spring Boot module banao**
+   - Separate service: `bank-service` (ya agar time kam hai, same project mein alag package `com.consentchain.bankservice`)
+   - Dependencies: Spring Web, Spring Data JPA, MySQL Driver, Lombok
+
+2. **MySQL database + tables banao**
+   ```sql
+   CREATE DATABASE bank_service_db;
+   
+   CREATE TABLE customers (
+     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+     pan_number VARCHAR(10) UNIQUE,
+     name VARCHAR(100),
+     mobile_number VARCHAR(15),
+     netbanking_username VARCHAR(50),
+     netbanking_password VARCHAR(100)
+   );
+   
+   CREATE TABLE accounts (
+     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+     customer_id BIGINT,
+     bank_name VARCHAR(50),
+     account_number VARCHAR(20) UNIQUE,
+     ifsc VARCHAR(15),
+     balance DECIMAL(12,2),
+     FOREIGN KEY (customer_id) REFERENCES customers(id)
+   );
+   
+   CREATE TABLE transactions (
+     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+     account_id BIGINT,
+     txn_date DATE,
+     description VARCHAR(200),
+     amount DECIMAL(12,2),
+     type VARCHAR(10),
+     FOREIGN KEY (account_id) REFERENCES accounts(id)
+   );
+   
+   CREATE TABLE loan_history (
+     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+     account_id BIGINT,
+     loan_type VARCHAR(50),
+     amount DECIMAL(12,2),
+     status VARCHAR(20),
+     FOREIGN KEY (account_id) REFERENCES accounts(id)
+   );
+   ```
+
+3. **Entity classes banao** — `Customer`, `Account`, `Transaction`, `LoanHistory` (JPA `@Entity` annotations ke saath, upar wale tables se map)
+
+4. **Repository interfaces** — `CustomerRepository`, `AccountRepository` etc. (`extends JpaRepository`)
+
+5. **Seed data insert karo** — pehle diye JSON ko convert karke `data.sql` file mein daal do (`src/main/resources/data.sql`), Spring Boot startup pe automatically load ho jayega.
+
+6. **REST APIs banao (controller layer):**
+   - `POST /bank/verify-account` — PAN/mobile + netbanking credentials leke verify kare, account link confirm kare
+   - `POST /bank/fetch-statement` — account number + date range leke transactions return kare
+   - `GET /bank/loan-history/{accountNumber}` — loan history return kare
+
+7. **Security add karo** — yeh APIs sirf AA service se hi call hone chahiye, isliye ek simple **API key/token check** filter lagao (jaise header mein `X-AA-Token`, hardcoded ya JWT verify karo).
+
+8. **Port alag rakho** — agar teen alag banks simulate karni hain (HDFC, SBI, ICICI), toh:
+   - Simplest: ek hi service, `bankName` parameter se differentiate karo database mein
+   - Realistic: teen alag Spring Boot instances (alag ports — 8081, 8082, 8083) run karo, same codebase, sirf application.properties mein `bank.name=HDFC/SBI/ICICI` set karo
+
+9. **AA service se connect karo** — tumhara main Spring Boot (AA layer) mapping table check karke, respective bank service ke port/URL pe REST call karega (RestTemplate/WebClient use karke), response consolidate karke FIU ko dega.
+
+10. **Test karo** — Postman se pehle bank service standalone test karo (`/fetch-statement` sahi data de raha hai kya), phir AA se integrate karke end-to-end test karo.
+
+Yeh 10 steps hain complete setup ke liye. Konse step pe detailed code chahiye — jaise Entity class ka full code, ya Controller ka?
+
 ## Setup Notes for Contributors
 
 - Clone the repo, create your module folder under the project root (already scaffolded)
