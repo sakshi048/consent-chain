@@ -1,4 +1,7 @@
 package com.consentchain.bankservice.model;
 
-public class ConsentStatus {
+public enum ConsentStatus {
+    ACTIVE,
+    EXPIRED,
+    REVOKED
 }
