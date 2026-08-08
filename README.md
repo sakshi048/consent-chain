@@ -291,6 +291,32 @@ consent-chain/
 
 ---
 
+## Database Specification & Decisions
+
+Full SQL schema (bank-service + aggregator-service), seed data, and the consent artefact JSON structure are documented separately in `docs/ConsentChain_Database_Specification.docx`. Summary of the key decisions:
+
+| Decision | Choice | Reason |
+|---|---|---|
+| Database engine (dev) | H2 (in-memory / file-based) | Zero external setup, fast iteration. File-mode (`jdbc:h2:file:./data/bankdb`) used where persistence across restarts is needed. |
+| Database engine (persistent option) | MySQL | Considered for a shared, persistent store once development stabilises — not required at the current stage. |
+| Data model style | Relational (SQL) + a JSON text column for consent artefacts | Core entities are naturally relational (foreign keys, joins). The consent artefact is nested/flexible, so it's serialised as JSON in a `TEXT` column rather than fully normalised — structured columns (`consent_id`, `status`, `valid_till`) stay outside the JSON for fast queries. |
+| bank-service vs aggregator-service databases | Separate database per service (`bank_service_db`, `aggregator_service_db`) | Each module owns its schema so the two services can be developed/deployed independently. |
+| Bank simulation (HDFC/SBI/ICICI) | Single `bank-service`, differentiated by a `bank_name` column | Simpler than running three separate instances; sufficient to demonstrate the FIP role across multiple banks. |
+
+**Table ownership**
+
+| Table | Owning service | Purpose |
+|---|---|---|
+| `customers`, `accounts`, `transactions`, `loan_history` | bank-service | Simulated financial data |
+| `consent_artefacts` (local) | bank-service | Lightweight consent validation at the FIP |
+| `consent_artefacts` (master) | aggregator-service | Full consent record with JSON artefact + audit reference |
+| `data_requests` | aggregator-service | FIU-originated requests and routing status |
+| `institution_mapping` | aggregator-service | Links a customer (PAN) to accounts across banks |
+| `institutions` | aggregator-service | Registry of FIPs/FIUs with status and API key |
+| `audit_blocks` | aggregator-service | SHA-256 hash-chain audit trail |
+
+---
+
 ## Bank/FIP Data Model
 
 ```
