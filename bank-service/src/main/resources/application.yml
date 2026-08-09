@@ -3,18 +3,11 @@ spring:
     name: bank-service
 
   datasource:
-    url: jdbc:h2:mem:bankdb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:mysql://localhost:3306/consentchain_auth
+    username:  ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
 
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
     show-sql: true
