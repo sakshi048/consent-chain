@@ -5,14 +5,17 @@ import com.consentchain.bankservice.dto.LoginResponse;
 import com.consentchain.bankservice.dto.RegisterRequest;
 import com.consentchain.bankservice.model.User;
 import com.consentchain.bankservice.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public String register(RegisterRequest request) {
@@ -33,8 +36,9 @@ public class AuthService {
                 request.getUsername()
         );
 
+        // Store the BCrypt hash, never the raw password
         user.setPassword(
-                request.getPassword()
+                passwordEncoder.encode(request.getPassword())
         );
 
         user.setRole(
@@ -82,8 +86,8 @@ public class AuthService {
             );
         }
 
-        if (!user.getPassword()
-                .equals(request.getPassword())) {
+        // Compare raw input password against the stored BCrypt hash
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
 
             return new LoginResponse(
                     false,
