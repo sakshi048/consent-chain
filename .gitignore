@@ -1,1 +1,26 @@
+# IDE
 .idea/
+*.iml
+
+# JVM crash logs (e.g. hs_err_pid3104.log)
+hs_err_pid*.log
+replay_pid*.log
+
+# Maven
+target/
+
+# Node / React
+node_modules/
+build/
+dist/
+
+# Environment variables / secrets
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
