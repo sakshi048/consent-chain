@@ -3,17 +3,17 @@ spring:
     name: bank-service
 
   datasource:
-    url: jdbc:mysql://localhost:3306/bank_service_db
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:mysql://localhost:3306/consentchain_auth
+    username:
+    password:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: true
 
 server:
   port: 8081
 
 bank:
-  aa-api-key: ${AA_API_KEY}
+  aa-api-key: test-api-auth
