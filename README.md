@@ -10,7 +10,7 @@ consent-chain/
 ├── aggregator-service/        → Account Aggregator + Blockchain audit layer
 ├── frontend-consent-dashboard/→ React UI (Consent management + dashboard)
 ├── docs/                      → Architecture diagrams, API contracts
-└── README.md
+└── README.md sakshi
 ```
 
 ## Team & Responsibilities
