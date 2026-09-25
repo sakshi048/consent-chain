@@ -4,6 +4,7 @@ import com.consentchain.bankservice.dto.LoginRequest;
 import com.consentchain.bankservice.dto.LoginResponse;
 import com.consentchain.bankservice.dto.RegisterRequest;
 import com.consentchain.bankservice.service.AuthService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
