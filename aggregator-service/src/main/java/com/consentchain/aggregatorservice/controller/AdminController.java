@@ -47,6 +47,8 @@ public class AdminController {
         return consentRepository.findAll();
     }
 
+
+// audit logs is present in consent artefact(ConsentChain_Database_Specification.docx)
     @GetMapping("/audit-logs")
     public List<AuditLog> auditLogs() {
         return auditLogRepository.findAll();

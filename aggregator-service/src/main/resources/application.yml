@@ -3,9 +3,9 @@ spring:
     name: aggregator-service
 
   datasource:
-    url: jdbc:mysql://localhost:3306/ aggregator_service_db
-    username:
-    password:
+    url: jdbc:mysql://localhost:3306/aggregator_service_db
+    username: root
+    password: Apatil#2704
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:

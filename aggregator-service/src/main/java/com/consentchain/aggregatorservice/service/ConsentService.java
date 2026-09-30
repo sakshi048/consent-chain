@@ -132,6 +132,8 @@ public class ConsentService {
         return saved;
     }
 
+
+// blockchain
     public Consent revoke(
             String consentId) {
 

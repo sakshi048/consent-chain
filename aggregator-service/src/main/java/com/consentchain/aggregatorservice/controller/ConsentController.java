@@ -65,7 +65,7 @@ public class ConsentController {
                 consentService.reject(consentId)
         );
     }
-
+// the endpoints of approve, revoke and reject will be used in blockchain so that all logs will be maintained in blockchain
     @PutMapping("/{consentId}/revoke")
     public ResponseEntity<Consent> revoke(
             @PathVariable String consentId) {
