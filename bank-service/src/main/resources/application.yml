@@ -4,8 +4,8 @@ spring:
 
   datasource:
     url: jdbc:mysql://localhost:3306/consentchain_auth
-    username:
-    password:
+    username: root
+    password: Apatil#2704
 
   jpa:
     hibernate:

@@ -18,6 +18,8 @@ public class AccountController {
         this.accountService = accountService;
     }
 
+
+// step 4(connect financial account)
     @PostMapping("/link")
     public ResponseEntity<?> linkBank(
             @RequestBody LinkBankRequest request) {
