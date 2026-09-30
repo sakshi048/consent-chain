@@ -4,6 +4,9 @@ import Login from "./components/Login";
 import Signup from "./components/Signup";
 import FipDashboard from "./pages/FipDashboard";
 import FiuDashboard from "./pages/FiuDashboard";
+import CustomerDashboard from "./pages/CustomerDashboard";
+import FiuCreateRequest from "./pages/FiuCreateRequest";
+import FiuMyRequests from "./pages/FiuMyRequests";
 
 function App() {
   return (
@@ -15,9 +18,15 @@ function App() {
 
         <Route path="/signup" element={<Signup />} />
 
+        <Route path="/customer/dashboard" element={<CustomerDashboard />} />
+
         <Route path="/fip/dashboard" element={<FipDashboard />} />
 
         <Route path="/fiu/dashboard" element={<FiuDashboard />} />
+
+        <Route path="/fiu/requests/create" element={<FiuCreateRequest />} />
+
+        <Route path="/fiu/requests" element={<FiuMyRequests />} />
 
         <Route
           path="*"

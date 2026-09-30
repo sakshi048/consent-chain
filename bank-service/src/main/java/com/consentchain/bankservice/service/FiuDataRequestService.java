@@ -70,4 +70,11 @@ public class FiuDataRequestService {
 
         return response;
     }
+
+    public java.util.List<DataRequestResponse> getAllDataRequests() {
+        return dataRequestRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))
+                .stream()
+                .map(this::convertToResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
 }

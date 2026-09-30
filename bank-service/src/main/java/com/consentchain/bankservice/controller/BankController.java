@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/bank")
 public class BankController {
@@ -59,6 +60,85 @@ public class BankController {
     @GetMapping("/health-check")
     public String healthCheck() {
         return "Bank service is up";
+    }
+
+    @GetMapping("/branches")
+    public ResponseEntity<List<Map<String, String>>> getBranches(
+            @RequestParam(defaultValue = "Maharashtra") String state,
+            @RequestParam(defaultValue = "Mumbai") String city) {
+
+        log.info("Get branches request: state={}, city={}", state, city);
+
+        List<Map<String, String>> branches;
+
+        if ("Maharashtra".equalsIgnoreCase(state) && "Pune".equalsIgnoreCase(city)) {
+            branches = List.of(
+                    Map.of("bankName", "HDFC Bank", "ifscCode", "HDFC0001234", "branchName", "FC Road Branch, Pune"),
+                    Map.of("bankName", "State Bank of India (SBI)", "ifscCode", "SBIN0004567", "branchName", "Shivajinagar Branch, Pune"),
+                    Map.of("bankName", "ICICI Bank", "ifscCode", "ICIC0007890", "branchName", "Kothrud Branch, Pune")
+            );
+        } else if ("Karnataka".equalsIgnoreCase(state)) {
+            branches = List.of(
+                    Map.of("bankName", "HDFC Bank", "ifscCode", "HDFC0001234", "branchName", "MG Road Branch, Bengaluru"),
+                    Map.of("bankName", "State Bank of India (SBI)", "ifscCode", "SBIN0004567", "branchName", "Koramangala Branch, Bengaluru"),
+                    Map.of("bankName", "ICICI Bank", "ifscCode", "ICIC0007890", "branchName", "Indiranagar Branch, Bengaluru")
+            );
+        } else if ("Delhi".equalsIgnoreCase(state)) {
+            branches = List.of(
+                    Map.of("bankName", "HDFC Bank", "ifscCode", "HDFC0001234", "branchName", "Connaught Place, New Delhi"),
+                    Map.of("bankName", "State Bank of India (SBI)", "ifscCode", "SBIN0004567", "branchName", "Parliament Street, New Delhi"),
+                    Map.of("bankName", "ICICI Bank", "ifscCode", "ICIC0007890", "branchName", "Nehru Place, New Delhi")
+            );
+        } else {
+            // Default Maharashtra / Mumbai branches matching seed data
+            branches = List.of(
+                    Map.of("bankName", "HDFC Bank", "ifscCode", "HDFC0001234", "branchName", "Mumbai Main Branch"),
+                    Map.of("bankName", "State Bank of India (SBI)", "ifscCode", "SBIN0004567", "branchName", "Fort Branch, Mumbai"),
+                    Map.of("bankName", "ICICI Bank", "ifscCode", "ICIC0007890", "branchName", "BKC Branch, Mumbai")
+            );
+        }
+
+        return ResponseEntity.ok(branches);
+    }
+
+    @GetMapping("/account-lookup")
+    public ResponseEntity<?> accountLookup(
+            @RequestParam String accNo,
+            @RequestParam(required = false) String ifsc) {
+
+        log.info("Account-lookup request: accNo={}, ifsc={}", accNo, ifsc);
+
+        String cleanedAcc = accNo != null ? accNo.trim().toUpperCase() : "";
+        Optional<Account> accountOpt = accountRepository.findByAccountNumber(cleanedAcc);
+
+        List<String> seedAccs = List.of("AC1000234567", "AC2000998877", "AC1000234568", "AC3000556644");
+
+        if (accountOpt.isEmpty() && !seedAccs.contains(cleanedAcc)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "verified", false,
+                    "message", "Invalid account number. Account not found in seed database."
+            ));
+        }
+
+        String accountHolderName = "Verified Customer";
+        String accountType = "Savings";
+
+        if (accountOpt.isPresent()) {
+            Account account = accountOpt.get();
+            Optional<Customer> customerOpt = customerRepository.findById(account.getCustomerId());
+            if (customerOpt.isPresent()) {
+                accountHolderName = customerOpt.get().getName();
+            }
+        }
+
+        String maskedAccNo = "XXXX" + (cleanedAcc.length() >= 4 ? cleanedAcc.substring(cleanedAcc.length() - 4) : cleanedAcc);
+
+        return ResponseEntity.ok(Map.of(
+                "verified", true,
+                "accountHolderName", accountHolderName,
+                "accountType", accountType,
+                "maskedAccNo", maskedAccNo
+        ));
     }
 
     @PostMapping("/validate-consent")
