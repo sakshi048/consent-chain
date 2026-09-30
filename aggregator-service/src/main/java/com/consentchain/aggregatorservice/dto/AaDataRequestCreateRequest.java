@@ -3,7 +3,7 @@ package com.consentchain.aggregatorservice.dto;
 import java.time.LocalDate;
 import java.util.List;
 
-public class ConsentRequest {
+public class AaDataRequestCreateRequest {
 
     private String requestId;
 
@@ -19,7 +19,6 @@ public class ConsentRequest {
 
     private LocalDate toDate;
 
-
     public String getRequestId() {
         return requestId;
     }
@@ -27,7 +26,6 @@ public class ConsentRequest {
     public void setRequestId(String requestId) {
         this.requestId = requestId;
     }
-
 
     public Long getUserId() {
         return userId;
@@ -37,7 +35,6 @@ public class ConsentRequest {
         this.userId = userId;
     }
 
-
     public String getFiuId() {
         return fiuId;
     }
@@ -46,7 +43,6 @@ public class ConsentRequest {
         this.fiuId = fiuId;
     }
 
-
     public String getPurpose() {
         return purpose;
     }
@@ -54,7 +50,6 @@ public class ConsentRequest {
     public void setPurpose(String purpose) {
         this.purpose = purpose;
     }
-
 
     public List<String> getDataScopes() {
         return dataScopes;
@@ -66,7 +61,6 @@ public class ConsentRequest {
         this.dataScopes = dataScopes;
     }
 
-
     public LocalDate getFromDate() {
         return fromDate;
     }
@@ -76,7 +70,6 @@ public class ConsentRequest {
 
         this.fromDate = fromDate;
     }
-
 
     public LocalDate getToDate() {
         return toDate;

@@ -21,11 +21,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<String> register(
+            @RequestBody RegisterRequest request) {
+
         String result = authService.register(request);
-        if (result.equals("Username already exists")) {
+
+        if (result.equals("Username already exists")
+                || result.equals("Role is required")) {
+
             return ResponseEntity.badRequest().body(result);
         }
+
         return ResponseEntity.ok(result);
     }
 

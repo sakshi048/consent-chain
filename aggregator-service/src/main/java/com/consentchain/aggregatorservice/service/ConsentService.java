@@ -1,13 +1,17 @@
 package com.consentchain.aggregatorservice.service;
-import com.consentchain.aggregatorservice.dto.ConsentRequest;
+
+import com.consentchain.aggregatorservice.model.AaDataRequest;
 import com.consentchain.aggregatorservice.model.AuditAction;
 import com.consentchain.aggregatorservice.model.Consent;
 import com.consentchain.aggregatorservice.model.ConsentStatus;
+import com.consentchain.aggregatorservice.model.DataRequestStatus;
 import com.consentchain.aggregatorservice.model.User;
+import com.consentchain.aggregatorservice.repository.AaDataRequestRepository;
 import com.consentchain.aggregatorservice.repository.ConsentRepository;
 import com.consentchain.aggregatorservice.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -18,153 +22,519 @@ public class ConsentService {
     private final ConsentRepository consentRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final FipClientService fipClientService;
+    private final AaDataRequestRepository dataRequestRepository;
 
     public ConsentService(
             ConsentRepository consentRepository,
             UserRepository userRepository,
-            AuditService auditService) {
+            AuditService auditService,
+            FipClientService fipClientService,
+            AaDataRequestRepository dataRequestRepository) {
 
         this.consentRepository = consentRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.fipClientService = fipClientService;
+        this.dataRequestRepository = dataRequestRepository;
     }
 
+    // =========================================================
+    // CREATE CONSENT
+    // =========================================================
+
     public Consent createConsent(
-            ConsentRequest request) {
+            String requestId,
+            Long userId,
+            String fiuId,
+            String purpose,
+            List<String> dataScopes,
+            LocalDate fromDate,
+            LocalDate toDate) {
 
-        User user = userRepository
-                .findById(request.getUserId())
-                .orElseThrow(() ->
-                        new RuntimeException("User not found"));
+        // -----------------------------------------------------
+        // VALIDATION
+        // -----------------------------------------------------
 
-        Consent consent = new Consent();
+        if (requestId == null ||
+                requestId.isBlank()) {
 
-        consent.setConsentId(
+            throw new RuntimeException(
+                    "Request ID is required");
+        }
+
+        if (userId == null) {
+
+            throw new RuntimeException(
+                    "User ID is required");
+        }
+
+        if (fiuId == null ||
+                fiuId.isBlank()) {
+
+            throw new RuntimeException(
+                    "FIU ID is required");
+        }
+
+        if (purpose == null ||
+                purpose.isBlank()) {
+
+            throw new RuntimeException(
+                    "Purpose is required");
+        }
+
+        if (dataScopes == null ||
+                dataScopes.isEmpty()) {
+
+            throw new RuntimeException(
+                    "At least one data scope is required");
+        }
+
+        if (fromDate == null) {
+
+            throw new RuntimeException(
+                    "From date is required");
+        }
+
+        if (toDate == null) {
+
+            throw new RuntimeException(
+                    "To date is required");
+        }
+
+        if (toDate.isBefore(fromDate)) {
+
+            throw new RuntimeException(
+                    "To date cannot be before from date");
+        }
+
+        // -----------------------------------------------------
+        // CHECK USER
+        // -----------------------------------------------------
+
+        User user =
+                userRepository.findById(userId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"));
+
+        // -----------------------------------------------------
+        // GENERATE CONSENT ID
+        // -----------------------------------------------------
+
+        String consentId =
                 "CONSENT-" +
                         UUID.randomUUID()
                                 .toString()
                                 .substring(0, 8)
-                                .toUpperCase()
-        );
+                                .toUpperCase();
 
-        consent.setRequestId(request.getRequestId());
-        consent.setUser(user);
-        consent.setFiuId(request.getFiuId());
-        consent.setPurpose(request.getPurpose());
-        consent.setDataScopes(request.getDataScopes());
-        consent.setFromDate(request.getFromDate());
-        consent.setToDate(request.getToDate());
+        // -----------------------------------------------------
+        // CREATE CONSENT
+        // -----------------------------------------------------
 
-        consent.setStatus(ConsentStatus.PENDING);
+        Consent consent =
+                new Consent();
 
-        consent.setCreatedAt(LocalDateTime.now());
+        consent.setConsentId(
+                consentId);
+
+        consent.setRequestId(
+                requestId);
+
+        consent.setUser(
+                user);
+
+        consent.setFiuId(
+                fiuId);
+
+        consent.setPurpose(
+                purpose);
+
+        consent.setDataScopes(
+                dataScopes);
+
+        consent.setFromDate(
+                fromDate);
+
+        consent.setToDate(
+                toDate);
+
+        consent.setStatus(
+                ConsentStatus.PENDING);
+
+        consent.setCreatedAt(
+                LocalDateTime.now());
 
         consent.setExpiresAt(
-                LocalDateTime.now().plusDays(30)
-        );
+                LocalDateTime.now()
+                        .plusDays(30));
+
+        // -----------------------------------------------------
+        // SAVE
+        // -----------------------------------------------------
 
         Consent saved =
-                consentRepository.save(consent);
+                consentRepository.save(
+                        consent);
+
+        // -----------------------------------------------------
+        // AUDIT
+        // -----------------------------------------------------
 
         auditService.log(
                 user,
                 AuditAction.CONSENT_CREATED,
-                "Consent created: "
-                        + saved.getConsentId()
-        );
+                "Created consent "
+                        + saved.getConsentId());
 
         return saved;
     }
 
-    public List<Consent> getUserConsents(
-            Long userId) {
+    // =========================================================
+    // APPROVE CONSENT
+    // =========================================================
 
-        return consentRepository.findByUserId(userId);
-    }
-
-    public Consent approve(
+    public Consent approveConsent(
             String consentId) {
 
-        Consent consent = getConsent(consentId);
+        // -----------------------------------------------------
+        // FIND CONSENT
+        // -----------------------------------------------------
 
-        if (consent.getStatus() != ConsentStatus.PENDING) {
+        Consent consent =
+                consentRepository
+                        .findByConsentId(
+                                consentId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Consent not found"));
+
+        // -----------------------------------------------------
+        // CHECK STATUS
+        // -----------------------------------------------------
+
+        if (consent.getStatus() !=
+                ConsentStatus.PENDING) {
+
             throw new RuntimeException(
-                    "Only pending consent can be approved"
-            );
+                    "Only PENDING consent can be approved");
         }
 
-        consent.setStatus(ConsentStatus.ACTIVE);
+        // -----------------------------------------------------
+        // CHECK DATA SCOPES
+        // -----------------------------------------------------
+
+        if (consent.getDataScopes() == null ||
+                consent.getDataScopes().isEmpty()) {
+
+            throw new RuntimeException(
+                    "Consent data scope is empty");
+        }
+
+        // -----------------------------------------------------
+        // CONVERT DATA SCOPES
+        //
+        // AA:
+        // ["ACCOUNT", "TRANSACTIONS", "LOANS"]
+        //
+        // FIP:
+        // "ACCOUNT,TRANSACTIONS,LOANS"
+        // -----------------------------------------------------
+
+        String dataScope =
+                String.join(
+                        ",",
+                        consent.getDataScopes());
+
+        // -----------------------------------------------------
+        // REGISTER CONSENT AT FIP
+        // -----------------------------------------------------
+
+        try {
+
+            fipClientService.registerConsentAtFip(
+                    consent.getConsentId(),
+                    consent.getPurpose(),
+                    dataScope,
+                    consent.getExpiresAt()
+            );
+
+        } catch (Exception e) {
+
+            /*
+             * If FIP registration fails,
+             * AA consent remains PENDING.
+             */
+
+            throw new RuntimeException(
+                    "FIP consent registration failed: "
+                            + extractErrorMessage(e));
+        }
+
+        // -----------------------------------------------------
+        // ACTIVATE AA CONSENT
+        // -----------------------------------------------------
+
+        consent.setStatus(
+                ConsentStatus.ACTIVE);
 
         Consent saved =
-                consentRepository.save(consent);
+                consentRepository.save(
+                        consent);
+
+        // -----------------------------------------------------
+        // UPDATE RELATED DATA REQUEST
+        // -----------------------------------------------------
+
+        AaDataRequest dataRequest =
+                dataRequestRepository
+                        .findByConsentId(
+                                consent.getConsentId())
+                        .orElse(null);
+
+        if (dataRequest != null) {
+
+            dataRequest.setStatus(
+                    DataRequestStatus.CONSENT_APPROVED);
+
+            dataRequestRepository.save(
+                    dataRequest);
+        }
+
+        // -----------------------------------------------------
+        // AUDIT
+        // -----------------------------------------------------
 
         auditService.log(
                 consent.getUser(),
                 AuditAction.CONSENT_APPROVED,
-                "Consent approved: " + consentId
-        );
+                "Approved consent "
+                        + consent.getConsentId()
+                        + " and registered it at FIP");
 
         return saved;
     }
 
-    public Consent reject(
+    // =========================================================
+    // REJECT CONSENT
+    // =========================================================
+
+    public Consent rejectConsent(
             String consentId) {
 
-        Consent consent = getConsent(consentId);
+        // -----------------------------------------------------
+        // FIND CONSENT
+        // -----------------------------------------------------
 
-        if (consent.getStatus() != ConsentStatus.PENDING) {
+        Consent consent =
+                consentRepository
+                        .findByConsentId(
+                                consentId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Consent not found"));
+
+        // -----------------------------------------------------
+        // CHECK STATUS
+        // -----------------------------------------------------
+
+        if (consent.getStatus() !=
+                ConsentStatus.PENDING) {
+
             throw new RuntimeException(
-                    "Only pending consent can be rejected"
-            );
+                    "Only PENDING consent can be rejected");
         }
 
-        consent.setStatus(ConsentStatus.REJECTED);
+        // -----------------------------------------------------
+        // REJECT CONSENT
+        // -----------------------------------------------------
+
+        consent.setStatus(
+                ConsentStatus.REJECTED);
 
         Consent saved =
-                consentRepository.save(consent);
+                consentRepository.save(
+                        consent);
+
+        // -----------------------------------------------------
+        // UPDATE DATA REQUEST
+        // -----------------------------------------------------
+
+        AaDataRequest dataRequest =
+                dataRequestRepository
+                        .findByConsentId(
+                                consent.getConsentId())
+                        .orElse(null);
+
+        if (dataRequest != null) {
+
+            dataRequest.setStatus(
+                    DataRequestStatus.REJECTED);
+
+            dataRequestRepository.save(
+                    dataRequest);
+        }
+
+        // -----------------------------------------------------
+        // AUDIT
+        // -----------------------------------------------------
 
         auditService.log(
                 consent.getUser(),
                 AuditAction.CONSENT_REJECTED,
-                "Consent rejected: " + consentId
-        );
+                "Rejected consent "
+                        + consent.getConsentId());
 
         return saved;
     }
 
-    public Consent revoke(
+    // =========================================================
+    // REVOKE CONSENT
+    // =========================================================
+
+    public Consent revokeConsent(
             String consentId) {
 
-        Consent consent = getConsent(consentId);
+        // -----------------------------------------------------
+        // FIND CONSENT
+        // -----------------------------------------------------
 
-        if (consent.getStatus() != ConsentStatus.ACTIVE) {
+        Consent consent =
+                consentRepository
+                        .findByConsentId(
+                                consentId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Consent not found"));
+
+        // -----------------------------------------------------
+        // CHECK STATUS
+        // -----------------------------------------------------
+
+        if (consent.getStatus() !=
+                ConsentStatus.ACTIVE) {
+
             throw new RuntimeException(
-                    "Only active consent can be revoked"
-            );
+                    "Only ACTIVE consent can be revoked");
         }
 
-        consent.setStatus(ConsentStatus.REVOKED);
+        // -----------------------------------------------------
+        // REVOKE AT FIP FIRST
+        // -----------------------------------------------------
+
+        try {
+
+            fipClientService.revokeConsentAtFip(
+                    consent.getConsentId());
+
+        } catch (Exception e) {
+
+            /*
+             * If FIP revoke fails,
+             * AA consent remains ACTIVE.
+             */
+
+            throw new RuntimeException(
+                    "FIP consent revocation failed: "
+                            + extractErrorMessage(e));
+        }
+
+        // -----------------------------------------------------
+        // REVOKE AA CONSENT
+        // -----------------------------------------------------
+
+        consent.setStatus(
+                ConsentStatus.REVOKED);
 
         Consent saved =
-                consentRepository.save(consent);
+                consentRepository.save(
+                        consent);
+
+        // -----------------------------------------------------
+        // UPDATE DATA REQUEST
+        // -----------------------------------------------------
+
+        AaDataRequest dataRequest =
+                dataRequestRepository
+                        .findByConsentId(
+                                consent.getConsentId())
+                        .orElse(null);
+
+        if (dataRequest != null) {
+
+            dataRequest.setStatus(
+                    DataRequestStatus.REJECTED);
+
+            dataRequestRepository.save(
+                    dataRequest);
+        }
+
+        // -----------------------------------------------------
+        // AUDIT
+        // -----------------------------------------------------
 
         auditService.log(
                 consent.getUser(),
                 AuditAction.CONSENT_REVOKED,
-                "Consent revoked: " + consentId
-        );
+                "Revoked consent "
+                        + consent.getConsentId()
+                        + " at FIP");
 
         return saved;
     }
+
+    // =========================================================
+    // GET USER CONSENTS
+    // =========================================================
+
+    public List<Consent> getUserConsents(
+            Long userId) {
+
+        if (!userRepository.existsById(userId)) {
+
+            throw new RuntimeException(
+                    "User not found");
+        }
+
+        return consentRepository
+                .findByUserId(userId);
+    }
+
+    // =========================================================
+    // GET CONSENT
+    // =========================================================
 
     public Consent getConsent(
             String consentId) {
 
         return consentRepository
-                .findByConsentId(consentId)
+                .findByConsentId(
+                        consentId)
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Consent not found"
-                        ));
+                                "Consent not found"));
+    }
+
+    // =========================================================
+    // ERROR MESSAGE
+    // =========================================================
+
+    private String extractErrorMessage(
+            Exception e) {
+
+        Throwable cause = e;
+
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+
+        if (cause.getMessage() != null &&
+                !cause.getMessage().isBlank()) {
+
+            return cause.getMessage();
+        }
+
+        return e.getMessage();
     }
 }

@@ -4,61 +4,59 @@ import jakarta.persistence.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
-@Table(name = "consents")
-public class Consent {
+@Table(name = "aa_data_requests")
+public class AaDataRequest {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "consent_id", unique = true, nullable = false)
-    private String consentId;
-
-    @Column(name = "request_id", nullable = false)
+    @Column(
+            name = "request_id",
+            unique = true,
+            nullable = false
+    )
     private String requestId;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(nullable = false)
+    private Long userId;
 
+    @Column(nullable = false)
     private String fiuId;
 
+    @Column(nullable = false)
     private String purpose;
 
-    @ElementCollection
-    @CollectionTable(
-            name = "consent_data_scopes",
-            joinColumns = @JoinColumn(name = "consent_id")
+    @Column(
+            name = "data_scopes",
+            nullable = false
     )
-    @Column(name = "data_scope")
-    private List<String> dataScopes;
+    private String dataScopes;
 
     private LocalDate fromDate;
 
     private LocalDate toDate;
 
-    @Enumerated(EnumType.STRING)
-    private ConsentStatus status;
+    @Column(name = "consent_id")
+    private String consentId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private DataRequestStatus status;
+
+    @Column(
+            name = "created_at",
+            nullable = false
+    )
     private LocalDateTime createdAt;
 
-    private LocalDateTime expiresAt;
-
-    public Consent() {}
+    public AaDataRequest() {
+    }
 
     public Long getId() {
         return id;
-    }
-
-    public String getConsentId() {
-        return consentId;
-    }
-
-    public void setConsentId(String consentId) {
-        this.consentId = consentId;
     }
 
     public String getRequestId() {
@@ -69,12 +67,12 @@ public class Consent {
         this.requestId = requestId;
     }
 
-    public User getUser() {
-        return user;
+    public Long getUserId() {
+        return userId;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public String getFiuId() {
@@ -93,11 +91,11 @@ public class Consent {
         this.purpose = purpose;
     }
 
-    public List<String> getDataScopes() {
+    public String getDataScopes() {
         return dataScopes;
     }
 
-    public void setDataScopes(List<String> dataScopes) {
+    public void setDataScopes(String dataScopes) {
         this.dataScopes = dataScopes;
     }
 
@@ -109,19 +107,27 @@ public class Consent {
         this.fromDate = fromDate;
     }
 
-    public void setToDate(LocalDate toDate) {
-        this.toDate = toDate;
-    }
-
     public LocalDate getToDate() {
         return toDate;
     }
 
-    public ConsentStatus getStatus() {
+    public void setToDate(LocalDate toDate) {
+        this.toDate = toDate;
+    }
+
+    public String getConsentId() {
+        return consentId;
+    }
+
+    public void setConsentId(String consentId) {
+        this.consentId = consentId;
+    }
+
+    public DataRequestStatus getStatus() {
         return status;
     }
 
-    public void setStatus(ConsentStatus status) {
+    public void setStatus(DataRequestStatus status) {
         this.status = status;
     }
 
@@ -131,13 +137,5 @@ public class Consent {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getExpiresAt() {
-        return expiresAt;
-    }
-
-    public void setExpiresAt(LocalDateTime expiresAt) {
-        this.expiresAt = expiresAt;
     }
 }
