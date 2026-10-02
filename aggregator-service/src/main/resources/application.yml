@@ -3,21 +3,19 @@ spring:
     name: aggregator-service
 
   datasource:
-    url: jdbc:h2:mem:aggregatordb
-    driver-class-name: org.h2.Driver
-    username: sakshi
-    password:
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:mysql://localhost:3306/aggregator_service_db
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
     show-sql: true
 
 server:
   port: 8082
+
+fip:
+  base-url: http://localhost:8081
+  aa-api-key: AA-SECRET-123

@@ -3,9 +3,13 @@ package com.consentchain.bankservice.repository;
 import com.consentchain.bankservice.model.ConsentArtefact;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
 import java.util.Optional;
 
 @Repository
-public interface ConsentArtefactRepository extends JpaRepository<ConsentArtefact, Long> {
-    Optional<ConsentArtefact> findByConsentId(String consentId);
+public interface ConsentArtefactRepository
+        extends JpaRepository<ConsentArtefact, Long> {
+
+    Optional<ConsentArtefact> findByConsentId(
+            String consentId);
 }

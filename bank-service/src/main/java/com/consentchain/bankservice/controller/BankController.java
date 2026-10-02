@@ -2,20 +2,14 @@ package com.consentchain.bankservice.controller;
 
 import com.consentchain.bankservice.dto.ConsentValidationRequest;
 import com.consentchain.bankservice.dto.ConsentValidationResponse;
-import com.consentchain.bankservice.model.Account;
-import com.consentchain.bankservice.model.ConsentArtefact;
-import com.consentchain.bankservice.model.ConsentStatus;
-import com.consentchain.bankservice.model.LoanHistory;
-import com.consentchain.bankservice.model.Transaction;
-import com.consentchain.bankservice.repository.ConsentArtefactRepository;
-import com.consentchain.bankservice.repository.LoanHistoryRepository;
-import com.consentchain.bankservice.repository.TransactionRepository;
+import com.consentchain.bankservice.dto.VerifyAccountRequest;
+import com.consentchain.bankservice.model.*;
+import com.consentchain.bankservice.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.consentchain.bankservice.repository.AccountRepository;
 
 import java.util.Base64;
 import java.nio.charset.StandardCharsets;
@@ -36,13 +30,16 @@ public class BankController {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final LoanHistoryRepository loanHistoryRepository;
+    private final CustomerRepository customerRepository;
 
     public BankController(ConsentArtefactRepository consentArtefactRepository,
                           AccountRepository accountRepository,
+                          CustomerRepository customerRepository,
                           TransactionRepository transactionRepository,
                           LoanHistoryRepository loanHistoryRepository) {
         this.consentArtefactRepository = consentArtefactRepository;
         this.accountRepository = accountRepository;
+        this.customerRepository = customerRepository;
         this.transactionRepository = transactionRepository;
         this.loanHistoryRepository = loanHistoryRepository;
     }
@@ -175,6 +172,71 @@ public class BankController {
         log.info("Loan-history success: accountNumber={}, loanCount={}", accountNumber, loans.size());
 
         return ResponseEntity.ok(loans);
+    }
+    @PostMapping("/verify-account")
+    public ResponseEntity<?> verifyAccount(
+            @RequestBody VerifyAccountRequest request) {
+
+        log.info("Account verification request received for username={}",
+                request.getUsername());
+
+        // 1. Find customer using net banking username
+        Optional<Customer> customerOpt =
+                customerRepository.findByNetbankingUsername(
+                        request.getUsername());
+
+        if (customerOpt.isEmpty()) {
+            return ResponseEntity.ok(
+                    Map.of(
+                            "verified", false,
+                            "message", "Customer not found"
+                    )
+            );
+        }
+
+        Customer customer = customerOpt.get();
+
+        // 2. Verify password
+        if (!customer.getNetbankingPassword()
+                .equals(request.getPassword())) {
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "verified", false,
+                            "message", "Invalid bank credentials"
+                    )
+            );
+        }
+
+        // 3. Find customer's bank accounts
+        List<Account> accounts =
+                accountRepository.findByCustomerId(
+                        customer.getId());
+
+        if (accounts.isEmpty()) {
+            return ResponseEntity.ok(
+                    Map.of(
+                            "verified", false,
+                            "message", "No bank account found"
+                    )
+            );
+        }
+
+        // For now use the first account
+        Account account = accounts.get(0);
+
+        // 4. Return verified account information
+        return ResponseEntity.ok(
+                Map.of(
+                        "verified", true,
+                        "customerId", customer.getId(),
+                        "customerName", customer.getName(),
+                        "panNumber", customer.getPanNumber(),
+                        "bankName", account.getBankName(),
+                        "accountNumber", account.getAccountNumber(),
+                        "ifsc", account.getIfsc()
+                )
+        );
     }
 
 }
