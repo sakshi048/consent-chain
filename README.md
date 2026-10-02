@@ -1,6 +1,6 @@
 <div align="center">
 
-<<<<<<< HEAD
+
 # 🔗 ConsentChain
 
 ### A consent-first reference implementation of RBI's Account Aggregator (AA) framework
