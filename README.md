@@ -1,680 +1,917 @@
-# ConsentChain
+<div align="center">
 
-A blockchain-based reference implementation of RBI's **Account Aggregator (AA) framework** for secure, consent-driven financial data sharing.
+# 🔗 ConsentChain
 
-ConsentChain demonstrates how a customer can authorize a Financial Information User (FIU) to access financial information held by one or more Financial Information Providers (FIPs) through an Account Aggregator. The project focuses on **consent management, secure data sharing, revocation, and tamper-evident audit logging**.
+### A consent-first reference implementation of RBI's Account Aggregator (AA) framework
 
-> 📋 Detailed build history and today's session log: [docs/readmeFiles/CHANGELOG.md](docs/readmeFiles/CHANGELOG.md)
+*Move financial data only when the customer says yes, only for the purpose they approved, and only until the consent expires or is revoked.*
 
----
+<br/>
 
-## Table of Contents
+![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.4-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![Maven](https://img.shields.io/badge/Maven-Wrapper-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white)
+![REST](https://img.shields.io/badge/API-REST%20%2F%20JSON-0A66C2?style=for-the-badge)
 
-- [Current Status](#current-status)
-- [Project Overview](#project-overview)
-- [FIP / FIU Role Logic](#fip--fiu-role-logic)
-- [End-to-End System Flow](#end-to-end-system-flow)
-- [Consent Lifecycle](#consent-lifecycle)
-- [Example: Complete Loan Data Flow](#example-complete-loan-data-flow)
-- [Project Structure](#project-structure)
-- [Team & Responsibilities](#team--responsibilities)
-- [Technology Stack](#technology-stack)
-- [Environment Variables](#environment-variables)
-- [Database Specification & Decisions](#database-specification--decisions)
-- [Bank/FIP Data Model](#bankfip-data-model)
-- [Bank Service Consent Model](#bank-service-consent-model)
-- [Aggregator Service — Responsibilities](#aggregator-service--responsibilities)
-- [Blockchain / Hash-Chain Audit](#blockchain--hash-chain-audit)
-- [Revocation Flow](#revocation-flow)
-- [Frontend Page Structure](#frontend-page-structure)
-- [Bank Simulation Options](#bank-simulation-options)
-- [Service Communication](#service-communication)
-- [Security](#security)
-- [Authentication Strategy — Why JWT Only in Aggregator-Service](#authentication-strategy--why-jwt-only-in-aggregator-service)
-- [Bank Service API Contracts (with examples)](#bank-service-api-contracts-with-examples)
-- [Data Sharing Security Simulation](#data-sharing-security-simulation)
-- [System Flow](#system-flow)
-- [What Each Developer Should Focus On](#what-each-developer-should-focus-on)
-- [What We Are NOT Building](#what-we-are-not-building)
-- [Key Design Principle](#key-design-principle)
-- [Learning Goals](#learning-goals)
-- [Development Guidelines](#development-guidelines)
-- [How to Run](#how-to-run)
-- [Final Architecture](#final-architecture)
-- [Final Project Story](#final-project-story)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Backend](https://img.shields.io/badge/backend-functional-brightgreen?style=flat-square)
+![Frontend](https://img.shields.io/badge/frontend-in%20progress-yellow?style=flat-square)
+![Hash Chain](https://img.shields.io/badge/hash--chain%20ledger-planned-lightgrey?style=flat-square)
+
+</div>
 
 ---
 
-## Current Status
+## 📑 Table of Contents
 
-| Module | Status | Notes |
-|---|---|---|
-| `bank-service` | ✅ **Complete** | All FIP-simulation APIs implemented, tested end-to-end in Postman, MySQL-backed, API-key protected, BCrypt auth |
-| `aggregator-service` | 🔧 **In progress** | Schema + seed data done; application code (entities, repositories, services, controllers, JWT auth, consent brokering, hash-chain audit) is the current focus |
-| `frontend-consent-dashboard` | ⏳ **Not started** | Owned by frontend teammate |
-
-Next up: `ConsentArtefact` model + consent creation API in `aggregator-service`. Full task list in [docs/readmeFiles/CHANGELOG.md](docs/readmeFiles/CHANGELOG.md#whats-next).
-
----
-
-## Authentication Strategy — Why JWT Only in Aggregator-Service
-
-A deliberate decision was made to **not** implement JWT in `bank-service`, and instead keep its security minimal while concentrating full JWT-based authentication in `aggregator-service`. Reasoning:
-
-- **`bank-service` is only an FIP simulation.** In the real system, a bank authenticates its own customers directly (already covered by the simple `/auth/login` here) — but requests *from the AA* only need a lightweight check that they're coming from a trusted aggregator, not a full identity/session system.
-- **A simple API key (`X-AA-Token`) is sufficient** for that trust check — a static token the AA service sends with every request, verified by a small filter in `bank-service`. This is a ~10-line filter versus the ~100+ lines a proper JWT setup (signing key, expiry validation, refresh logic) would need.
-- **JWT belongs in `aggregator-service`** — that's where customers actually log in, sessions need to persist across a multi-step consent flow, and role-based access (separate FIP and FIU dashboards, described below) needs enforcing. That complexity justifies JWT; `bank-service` has none of it.
-
-**Verdict:** `bank-service` → simple API key. `aggregator-service` → JWT (to be built alongside its Auth module).
+1. [Overview](#-overview)
+2. [Key Features](#-key-features)
+3. [Architecture](#-architecture)
+4. [End-to-End Flows](#-end-to-end-flows)
+5. [Lifecycles and State Machines](#-lifecycles-and-state-machines)
+6. [Data Model](#-data-model)
+7. [Service Internals](#-service-internals)
+8. [API Reference](#-api-reference)
+9. [Security Model](#-security-model)
+10. [Audit Trail and Hash-Chain Ledger](#-audit-trail-and-hash-chain-ledger)
+11. [Tech Stack](#-tech-stack)
+12. [Getting Started](#-getting-started)
+13. [Configuration](#-configuration)
+14. [Repository Layout](#-repository-layout)
+15. [Project Status and Roadmap](#-project-status-and-roadmap)
 
 ---
 
-## Frontend — Role-Based Ports (FIP vs FIU)
+## 🌐 Overview
 
-Following the same reasoning used for an admin/user split in a typical app, the frontend serves **FIP and FIU as separate role-based experiences**, each pointing at its own set of endpoints on the shared `aggregator-service` backend (see the FIP/FIU role logic section below — an institution's role is per-request, not fixed, but each *frontend* still needs a distinct entry point):
+India's **Account Aggregator** framework, defined by the RBI, lets a customer share financial data between institutions through a regulated intermediary, using **explicit, purpose-bound, time-bound consent**. Three roles take part:
 
-- `frontend-consent-dashboard/fip/*` — FIP-side pages (Login, Dashboard, Data Requests, Request Details, Provide Authorized Data, Request History), calling `/fip/**` endpoints
-- `frontend-consent-dashboard/fiu/*` — FIU-side pages (Login, Dashboard, Create Data Request, My Requests, Received Data, Request History), calling `/fiu/**` endpoints
-
-Both frontends talk to the **same aggregator-service backend** — the split is only at the frontend routing/UI level, exactly like separating an admin panel from a user-facing app while both hit one backend. This avoids duplicating backend logic while still giving each role a focused, uncluttered UI.
-
----
-
-## Bank Service API Contracts (with examples)
-
-Base URL: `http://localhost:8081/bank`
-
-All protected endpoints require the header `X-AA-Token: <AA_API_KEY>` (see [Environment Variables](#environment-variables)).
-
-**1. Health Check**
-
-`GET /bank/health-check` → `200 OK` — `Bank service is up`
-
-**2. Validate Consent**
-
-`POST /bank/validate-consent`
-
-Request:
-```json
-{ "consentId": "consent-abc-123" }
-```
-
-Response — Valid (`200 OK`):
-```json
-{ "valid": true, "message": "Consent is valid" }
-```
-
-Response — Invalid/Expired (`400 Bad Request`):
-```json
-{ "valid": false, "message": "Consent is expired or revoked" }
-```
-
-Response — Not Found (`404 Not Found`):
-```json
-{ "valid": false, "message": "Consent not found" }
-```
-
-**3. Fetch Data**
-
-`POST /bank/fetch-data?accountNumber=SBIN0001234&consentId=consent-abc-123` (query params, no request body)
-
-Response — Success (`200 OK`):
-```json
-{ "encodedData": "eyJhY2NvdW50TnVtYmVyIjoi..." }
-```
-`encodedData` is a Base64-encoded JSON string containing `accountNumber`, `holderName`, `balance`, `ifscCode`. Decode it to read the actual data.
-
-Response — Consent Invalid (`403 Forbidden`):
-```json
-{ "valid": false, "message": "Consent invalid, data not shared" }
-```
-
-Response — Account/Consent Not Found (`500`): currently a generic error — will be improved with custom exception handling.
-
-**Status codes summary**
-
-| Code | Meaning |
-|---|---|
-| 200 | Success |
-| 400 | Consent expired/revoked |
-| 403 | Consent invalid — data not shared |
-| 404 | Consent not found |
-| 500 | Account not found (temporary — needs proper exception handling) |
-
-**Full `bank-service` endpoint list**
-
-| Endpoint | Method | Protected by `X-AA-Token`? | Purpose |
+| Role | Full name | What it does | In ConsentChain |
 |---|---|---|---|
-| `/bank/health-check` | GET | No | Liveness check |
-| `/auth/register` | POST | No | Register a bank-service user (password BCrypt-hashed) |
-| `/auth/login` | POST | No | Login (BCrypt-verified) |
-| `/bank/validate-consent` | POST | Yes | Check a consent artefact is ACTIVE and not expired |
-| `/bank/fetch-data` | POST | Yes | Return Base64-encoded account data if consent is valid |
-| `/bank/fetch-statement` | POST | Yes | Return transactions for an account (optional date range) |
-| `/bank/loan-history/{accountNumber}` | GET | Yes | Return loan history for an account |
+| **FIP** | Financial Information Provider | Holds the data (a bank) and releases it only against a valid consent | `bank-service` → `/fip/*` and `/bank/*` |
+| **FIU** | Financial Information User | Wants the data (a lender, for example) and asks the customer for it | `bank-service` → `/fiu/*` |
+| **AA** | Account Aggregator | Neutral broker that manages consent and routes data without being the data owner | `aggregator-service` → `/aa/*` |
 
-> `/bank/fetch-statement` and `/bank/loan-history/{accountNumber}` are implemented and tested — their request/response contracts will be added here once finalized.
+ConsentChain implements this three-party model end to end as two Spring Boot applications backed by MySQL: a customer registers with the AA, links a bank account, approves or rejects a consent request, and an FIU receives the data only after the consent is active. Revoking a consent propagates to the FIP, which then refuses further access.
+
+> **Why "Chain"?** The project is designed around a tamper-evident, SHA-256 hash-chained audit ledger for consent events. The `audit_blocks` schema exists, and the current build records an append-only `audit_logs` trail. See [Audit Trail and Hash-Chain Ledger](#-audit-trail-and-hash-chain-ledger) for exactly what is live and what is planned.
 
 ---
 
-## Data Sharing Security Simulation
+## ✨ Key Features
 
-For the initial implementation, `bank-service` uses **Base64 encoding** to simulate encoded data transfer.
-
-> Base64 is encoding, not encryption. It is used here only as a development/demo simulation. A production implementation would require proper encryption and secure key management.
+- **Three-party AA model**: separate FIP, FIU and AA responsibilities with clean REST boundaries.
+- **Full consent lifecycle**: create → approve / reject → revoke, with the FIP kept in sync.
+- **Consent-gated data access**: the FIP checks that a consent exists, is `ACTIVE` and has not passed `validTill` on **every** data call.
+- **Purpose and scope binding**: consents carry a purpose, data scopes (`ACCOUNT`, `TRANSACTIONS`, `LOANS`) and a date range, and the AA only fetches the scopes that were approved.
+- **Fail-safe ordering**: approval registers the consent at the FIP **before** the AA marks it active, and revocation hits the FIP **before** the AA marks it revoked. If the FIP call fails, the AA state does not change.
+- **Bank account linking**: the AA verifies a customer's bank credentials with the FIP before linking an account.
+- **Service-to-service authentication**: the FIP rejects AA calls that do not carry a valid `X-AA-Token`.
+- **Audit logging** of registrations, logins, bank links and every consent decision.
+- **MySQL persistence** with SQL schema and demo-data scripts under `docs/databaseScripts`.
 
 ---
 
-## System Flow
+## 🏗 Architecture
+
+### Account Aggregator System Architecture
 
 ![Account Aggregator System Flow](docs/Account%20Aggregator%20System%20Flow%20Infographic.png)
-
-*Complete page-flow diagram — Customer/AA interface, FIU interface, and FIP interface across the full consent lifecycle.*
-
----
-
-## Project Overview
-
-ConsentChain simulates an Account Aggregator ecosystem with three major roles:
-
-**Customer** — owner/controller of consent. Can create an account, connect financial accounts, view aggregated financial information, receive data-sharing requests, approve/deny consent, view active/expired/revoked consents, revoke consent, and view audit history.
-
-**FIP (Financial Information Provider)** — the institution holding the requested data. In our simulation, a bank acts as an FIP (Bank A, Bank B, Bank C). Maintains customer details, accounts, balances, transactions. Provides data only when authorized by valid consent.
-
-**FIU (Financial Information User)** — the institution requesting/using the data (e.g. a bank or fintech evaluating a loan application). Creates a data request specifying customer, purpose, required data, accounts, period, and consent validity.
-
-**AA (Account Aggregator)** — the consent broker and orchestrator. Creates/manages consent artefacts, validates consent, routes requests between FIUs and FIPs, coordinates authorized data retrieval, handles revocation, and maintains a tamper-evident audit trail via a custom SHA-256 hash chain.
-
----
-
-## FIP / FIU Role Logic
-
-FIP and FIU are **roles in a particular data-sharing request**, not permanent identities. An institution can act as an FIP in one request and an FIU in another.
+Two independently runnable Spring Boot services communicate over HTTP/JSON. The `bank-service` process hosts **both** the FIP and the FIU modules.
 
 ```mermaid
 flowchart LR
-    subgraph Example1["Example 1 — Loan from HDFC"]
-        A1["Bank A (FIP)"] --> AA1["AA"]
-        A2["Bank B (FIP)"] --> AA1
-        A3["Bank C (FIP)"] --> AA1
-        AA1 --> H1["HDFC Bank (FIU)"]
+    subgraph CLIENT["Client layer"]
+        UI["React UI<br/>(feature branch)"]
+        PM["Postman / cURL"]
     end
+
+    subgraph AA["aggregator-service : 8082  (Account Aggregator)"]
+        direction TB
+        AAC["Controllers<br/>auth, accounts, consents,<br/>data-requests, data, admin"]
+        AAS["Services<br/>Auth, Account, Consent,<br/>AaDataRequest, DataRequestExecution,<br/>Audit"]
+        AAX["Outbound clients<br/>FipClient, FipData, FiuClient<br/>(RestTemplate)"]
+        AAR["Spring Data JPA repositories"]
+        AAC --> AAS --> AAR
+        AAS --> AAX
+    end
+
+    subgraph BANK["bank-service : 8081"]
+        direction TB
+        FILTER["ApiKeyFilter<br/>X-AA-Token"]
+        subgraph FIP["FIP module (the bank)"]
+            FIPC["/fip/consents<br/>/fip/data/*<br/>/bank/*"]
+        end
+        subgraph FIU["FIU module (the data user)"]
+            FIUC["/fiu/data-request<br/>/fiu/data-request/{id}/result"]
+        end
+        AUTHB["/auth<br/>register, login (BCrypt)"]
+        BR["Spring Data JPA repositories"]
+        FILTER --> FIP
+        FIP --> BR
+        FIU --> BR
+        AUTHB --> BR
+    end
+
+    DBA[("MySQL<br/>aggregator_service_db")]
+    DBB[("MySQL<br/>bank_service_db")]
+
+    UI --> AAC
+    UI --> FIUC
+    PM --> AAC
+    PM --> FIPC
+    AAR --> DBA
+    BR --> DBB
+
+    AAX -- "verify-account" --> FIPC
+    AAX -- "register / revoke consent<br/>fetch data  (X-AA-Token)" --> FILTER
+    AAX -- "push data result" --> FIUC
+
+    classDef svc fill:#eef6ff,stroke:#2b6cb0,color:#1a365d;
+    classDef db fill:#fff7e6,stroke:#d69e2e,color:#744210;
+    class AA,BANK svc;
+    class DBA,DBB db;
 ```
+
+**Design notes**
+
+- The AA is deliberately **not** the data owner. It brokers consent and routes requests, while customer financial data lives in the FIP's database.
+- The FIP is the **last line of defence**. Even if the AA were compromised or buggy, the FIP independently validates the consent artefact before releasing data.
+- Each service owns its own schema and its own consent record. The AA holds the customer-facing consent, and the FIP holds the artefact it enforces.
+
+### Layered view of `aggregator-service`
 
 ```mermaid
-flowchart LR
-    subgraph Example2["Example 2 — Loan from a Fintech"]
-        B1["Bank A (FIP)"] --> AA2["AA"]
-        B2["Bank B (FIP)"] --> AA2
-        B3["Bank C (FIP)"] --> AA2
-        AA2 --> F1["Fintech X (FIU)"]
-    end
-```
+classDiagram
+    direction LR
 
-```mermaid
-flowchart LR
-    subgraph Example3["Example 3 — Same bank, different roles"]
-        C1["Bank A (FIP)"] --> AA3["AA"] --> H2["HDFC Bank (FIU)"]
-        H3["HDFC Bank (FIP)"] --> AA4["AA"] --> F2["Fintech X (FIU)"]
-    end
-```
+    class ConsentController
+    class AaDataRequestController
+    class DataRequestExecutionController
+    class AccountController
+    class AuthController
 
-The system should **not permanently classify an institution as only FIP or only FIU** — the role is determined per request.
+    class ConsentService {
+        +createConsent()
+        +approveConsent()
+        +rejectConsent()
+        +revokeConsent()
+        +getUserConsents()
+    }
+    class AaDataRequestService {
+        +createDataRequest()
+        +getDataRequest()
+    }
+    class DataRequestExecutionService {
+        +executeDataRequest()
+    }
+    class AccountService {
+        +linkBank()
+        +getAccounts()
+    }
+    class AuthService {
+        +register()
+        +login()
+    }
+    class AuditService {
+        +log()
+    }
+    class FipClientService {
+        +registerConsentAtFip()
+        +revokeConsentAtFip()
+    }
+    class FipDataService {
+        +fetchAccountData()
+        +fetchTransactions()
+        +fetchLoans()
+    }
+    class FiuClientService {
+        +sendDataRequestResult()
+    }
+
+    ConsentController --> ConsentService
+    AaDataRequestController --> AaDataRequestService
+    DataRequestExecutionController --> DataRequestExecutionService
+    AccountController --> AccountService
+    AuthController --> AuthService
+
+    AaDataRequestService --> ConsentService
+    ConsentService --> FipClientService
+    ConsentService --> AuditService
+    DataRequestExecutionService --> FipDataService
+    DataRequestExecutionService --> FiuClientService
+    AccountService --> AuditService
+    AuthService --> AuditService
+```
 
 ---
 
-## End-to-End System Flow
+## 🔄 End-to-End Flows
+
+### 1. Onboarding and bank linking
+
+The customer registers with the AA, then links a bank account. The AA never sees the bank's data directly. It asks the FIP to verify the customer's net-banking credentials and stores only the verified linkage.
 
 ```mermaid
 sequenceDiagram
-    participant FIU
-    participant AA as Aggregator Service (AA)
-    participant Cust as Customer
-    participant FIP as Bank Service (FIP)
+    autonumber
+    actor C as Customer
+    participant AA as aggregator-service
+    participant FIP as bank-service (FIP)
+    participant LOG as audit_logs
 
-    FIU->>AA: Create data request (purpose, data, accounts, period)
-    AA->>Cust: Send consent request
-    alt Customer approves
-        Cust->>AA: Approve
-        AA->>AA: Consent = ACTIVE
-        AA->>FIP: Request data (with consent artefact)
-        FIP->>FIP: Validate consent
-        FIP-->>AA: Return authorized data
-        AA-->>FIU: Deliver authorized data
-        AA->>AA: Record audit event (hash-chain)
-    else Customer denies
-        Cust->>AA: Deny
-        AA-->>FIU: Request closed
+    C->>AA: POST /aa/auth/register
+    AA->>LOG: USER_REGISTERED
+    AA-->>C: user created (role USER)
+
+    C->>AA: POST /aa/auth/login
+    AA->>LOG: USER_LOGIN
+    AA-->>C: userId, name, role
+
+    C->>AA: POST /aa/accounts/link<br/>(userId, bank username, password)
+    AA->>FIP: POST /bank/verify-account
+    alt credentials valid and account exists
+        FIP-->>AA: verified = true, PAN, bank, account, IFSC
+        AA->>AA: save LinkedBankAccount (status LINKED)
+        AA->>LOG: BANK_LINKED
+        AA-->>C: linked account
+    else invalid credentials or no account
+        FIP-->>AA: verified = false
+        AA-->>C: Bank account verification failed
     end
+```
+
+### 2. Consent request → approval → data delivery
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Customer
+    participant UI as Client / UI
+    participant FIU as bank-service (FIU)
+    participant AA as aggregator-service
+    participant FIP as bank-service (FIP)
+
+    UI->>FIU: POST /fiu/data-request<br/>(PAN, purpose, scope, dates)
+    FIU-->>UI: REQ-XXXXXXXX, status CONSENT_REQUIRED
+
+    Note over UI,AA: The FIU → AA hop is made by the client today.<br/>There is no server-side forwarding in the current code.
+    UI->>AA: POST /aa/data-requests<br/>(requestId, userId, fiuId, purpose, dataScopes, dates)
+    AA->>AA: create Consent (PENDING, expires in 30 days)<br/>create AaDataRequest (PENDING_CONSENT)
+    AA->>AA: audit CONSENT_CREATED
+    AA-->>UI: data request + consentId
+
+    C->>AA: PUT /aa/consents/{consentId}/approve
+    AA->>FIP: POST /fip/consents  [X-AA-Token]<br/>(consentId, purpose, dataScope, validTill)
+    FIP->>FIP: store ConsentArtefact (ACTIVE)
+    FIP-->>AA: 2xx
+    AA->>AA: Consent → ACTIVE<br/>DataRequest → CONSENT_APPROVED
+    AA->>AA: audit CONSENT_APPROVED
+
+    UI->>AA: POST /aa/data-requests/{requestId}/execute?accountNumber=…
+    AA->>AA: DataRequest → DATA_REQUESTED
+    loop for each approved scope (ACCOUNT, TRANSACTIONS, LOANS)
+        AA->>FIP: POST /fip/data/{account | transactions | loans}  [X-AA-Token]
+        FIP->>FIP: consent exists? ACTIVE? validTill in the future?
+        FIP-->>AA: scoped data
+    end
+    AA->>AA: DataRequest → DATA_RECEIVED
+    AA->>FIU: POST /fiu/data-request/{requestId}/result<br/>(status DATA_RECEIVED + data)
+    FIU->>FIU: persist response data as JSON
+    AA-->>UI: aggregated response
+```
+
+### 3. Rejection and revocation
+
+Consent decisions are never one-sided. The AA changes its own state **only after** the FIP has accepted the change.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Customer
+    participant AA as aggregator-service
+    participant FIP as bank-service (FIP)
+
+    rect rgb(255, 245, 245)
+    Note over C,FIP: Rejecting a pending consent (FIP is never contacted)
+    C->>AA: PUT /aa/consents/{id}/reject
+    AA->>AA: PENDING → REJECTED<br/>DataRequest → REJECTED<br/>audit CONSENT_REJECTED
+    end
+
+    rect rgb(255, 250, 235)
+    Note over C,FIP: Revoking an active consent
+    C->>AA: PUT /aa/consents/{id}/revoke
+    AA->>FIP: PUT /fip/consents/{id}/revoke  [X-AA-Token]
+    alt FIP accepts
+        FIP-->>AA: consent REVOKED
+        AA->>AA: ACTIVE → REVOKED<br/>DataRequest → REJECTED<br/>audit CONSENT_REVOKED
+        AA-->>C: revoked
+    else FIP call fails
+        FIP--xAA: error
+        AA-->>C: FIP consent revocation failed<br/>(AA consent stays ACTIVE)
+    end
+    end
+
+    Note over AA,FIP: Any later data call for this consent is refused:<br/>"Consent is not active"
 ```
 
 ---
 
-## Consent Lifecycle
+## 🧭 Lifecycles and State Machines
+
+### Consent (aggregator-service)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING
-    PENDING --> APPROVED
-    PENDING --> DENIED
-    APPROVED --> ACTIVE
-    ACTIVE --> REVOKED
-    ACTIVE --> EXPIRED
-    DENIED --> [*]
+    [*] --> PENDING : consent created (expires in 30 days)
+    PENDING --> ACTIVE : approve<br/>(after FIP registration succeeds)
+    PENDING --> REJECTED : reject
+    ACTIVE --> REVOKED : revoke<br/>(after FIP revocation succeeds)
+    ACTIVE --> EXPIRED : validTill passes
+    REJECTED --> [*]
+    REVOKED --> [*]
+    EXPIRED --> [*]
+
+    note right of EXPIRED
+        The FIP enforces expiry at access time
+        by comparing validTill with the current time.
+    end note
+```
+
+### Data request (aggregator-service)
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING_CONSENT : request created
+    PENDING_CONSENT --> CONSENT_APPROVED : consent approved
+    PENDING_CONSENT --> REJECTED : consent rejected
+    CONSENT_APPROVED --> DATA_REQUESTED : execute called
+    DATA_REQUESTED --> DATA_RECEIVED : FIP data fetched
+    CONSENT_APPROVED --> REJECTED : consent revoked
+    DATA_RECEIVED --> [*]
+    REJECTED --> [*]
+```
+
+### Consent artefact (bank-service / FIP)
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE : registered by AA<br/>(validTill must be in the future)
+    ACTIVE --> REVOKED : AA revokes
+    ACTIVE --> EXPIRED : validTill passes
     REVOKED --> [*]
     EXPIRED --> [*]
 ```
 
-Supported states: `PENDING`, `ACTIVE`, `DENIED`, `REVOKED`, `EXPIRED`. The AA validates whether a consent is currently usable.
-
----
-
-## Example: Complete Loan Data Flow
-
-Customer = Sakshi | FIPs = Bank A, Bank B | FIU = HDFC Bank | Purpose = Loan Application | Data = Balance + Transactions | Period = Last 6 Months
-
-1. FIU creates request (requester, providers, purpose, data, period)
-2. AA creates a consent artefact and sends it to the customer
-3. Customer reviews: who's requesting, why, what data, which accounts, for how long, validity
-4. Customer approves → consent becomes `ACTIVE`
-5. AA requests data from Bank A and Bank B; each FIP validates the consent first
-6. FIPs return data to AA
-7. AA routes authorized data to HDFC Bank
-8. Audit event recorded in the hash-chain
-9. Customer can later revoke → `ACTIVE → REVOKED`; further access is rejected
-
----
-
-## Project Structure
+### FIU data request (bank-service / FIU)
 
 ```mermaid
-flowchart TD
-    Root["consent-chain/"]
-    Root --> Bank["bank-service/<br/>Bank / FIP simulation"]
-    Root --> Agg["aggregator-service/<br/>Account Aggregator + consent broker<br/>+ blockchain/hash-chain audit layer"]
-    Root --> FE["frontend-consent-dashboard/<br/>React UI"]
-    FE --> FipFE["fip/ — FIP-side pages"]
-    FE --> FiuFE["fiu/ — FIU-side pages"]
-    FE --> CustFE["Customer dashboard, Consent management,<br/>Financial data, Audit log view"]
-    Root --> Docs["docs/<br/>Infographic · Architecture diagrams · API contracts"]
-    Docs --> ReadmeFilesDir["readmeFiles/"]
-    ReadmeFilesDir --> ChangelogFile["CHANGELOG.md"]
-    Root --> ReadmeFile["README.md"]
+stateDiagram-v2
+    [*] --> CONSENT_REQUIRED : POST /fiu/data-request
+    CONSENT_REQUIRED --> CONSENT_APPROVED : result pushed by AA
+    CONSENT_APPROVED --> DATA_REQUESTED : result pushed by AA
+    DATA_REQUESTED --> DATA_RECEIVED : result pushed by AA (with data)
+    CONSENT_REQUIRED --> REJECTED : result pushed by AA
+    DATA_RECEIVED --> [*]
+    REJECTED --> [*]
 ```
 
----
-
-## Team & Responsibilities
-
-| Member  | Module                       | Responsibility                                                                      |
-|---------|-------------------------------|--------------------------------------------------------------------------------------|
-| Sakshi + Bhunesh | `bank-service` (done) + `aggregator-service` (in progress) | Bank/FIP simulation — account data, consent validation, authorized data retrieval; and AA logic, consent broker, request routing, blockchain/hash-chain ledger, revocation |
-| [Name]  | `frontend-consent-dashboard`  | React UI — dashboard, consent grant/view/revoke, financial data, audit log           |
-
-**Why Sakshi and Bhunesh are pairing across both backend modules (not split):** `bank-service` and `aggregator-service` are tightly coupled — the aggregator directly calls the bank-service's endpoints, and the consent artefact structure has to match on both sides. Building both together avoids integration mismatches and means whoever builds the aggregator already deeply understands the FIP contract it's calling into. `bank-service` is now functionally complete; the same pairing continues into `aggregator-service`, which is the real, harder half of the project (consent brokering, routing, JWT auth, hash-chain audit).
+> The FIU accepts any valid `RequestStatus` from the AA's result callback, so the transitions above show the statuses the AA actually reports.
 
 ---
 
-## Technology Stack
+## 🗄 Data Model
 
-**Backend:** Java 21, Spring Boot 3.3.4, Maven, Spring Web, Spring Data JPA, Lombok
-**Database:** H2 (development/testing); MySQL for a persistent bank-service setup
-**Frontend:** React
-**Audit / Blockchain Layer:** Custom hash-chain, SHA-256, `MessageDigest`
+### `aggregator-service`: schema `aggregator_service_db`
 
----
-
-## Environment Variables
-
-Both services read credentials/secrets from environment variables instead of hardcoding them in `application.yml`. Each teammate should set these locally against **their own MySQL instance** — do not share DB credentials across machines.
-
-| Variable | Used In | Purpose | Notes |
-|---|---|---|---|
-| `DB_USERNAME` | bank-service, aggregator-service | MySQL username | Use your own local MySQL user |
-| `DB_PASSWORD` | bank-service, aggregator-service | MySQL password | Use your own local MySQL password |
-| `AA_API_KEY` | bank-service, aggregator-service | Shared secret for the `X-AA-Token` header — aggregator-service sends it, bank-service's `ApiKeyFilter` verifies it | `AA_API_KEY=aa-secret-key-2026` (same value must be set on both services) |
-
-> Each developer runs against their own local `bank_service_db` / `aggregator_service_db` — set up your own schema and seed data locally using the SQL scripts in `docs/`.
-
----
-
-## Database Specification & Decisions
-
-Both services run on **MySQL** (`bank_service_db` and `aggregator_service_db`), connected via Spring Data JPA with `ddl-auto: validate` — Hibernate checks entities against the existing hand-written schema at startup rather than auto-generating or altering tables, so the schema stays the single source of truth. Full SQL schema, seed data, and the consent artefact JSON structure are documented separately in `docs/ConsentChain_Database_Specification.docx`. Summary of the key decisions:
-
-| Decision | Choice | Reason |
-|---|---|---|
-| Database engine | MySQL | Persistent storage so seeded/test data survives restarts; matches the relational nature of the core entities. |
-| Schema management | Hand-written SQL + `ddl-auto: validate` | Schema is created explicitly via SQL scripts; Hibernate only validates entity mappings against it at startup, preventing accidental auto-migration from wiping or altering seeded data. |
-| Data model style | Relational (SQL) + a JSON text column for consent artefacts | Core entities are naturally relational (foreign keys, joins). The consent artefact is nested/flexible, so it's serialised as JSON in a `TEXT` column rather than fully normalised — structured columns (`consent_id`, `status`, `valid_till`) stay outside the JSON for fast queries. |
-| bank-service vs aggregator-service databases | Separate database per service (`bank_service_db`, `aggregator_service_db`) | Each module owns its schema so the two services can be developed/deployed independently. |
-| Bank simulation (HDFC/SBI/ICICI) | Single `bank-service`, differentiated by a `bank_name` column | Simpler than running three separate instances; sufficient to demonstrate the FIP role across multiple banks. |
-| Security layer split | JWT/API-key security concentrated in `aggregator-service`; `bank-service` kept intentionally simple | `bank-service` is a simulation of the FIP side only — the real system complexity (consent brokering, routing, audit) lives in the aggregator, so its security is kept minimal (basic auth, extended with a simple API-key check). |
-
-**Table ownership**
-
-| Table | Owning service | Purpose |
-|---|---|---|
-| `customers`, `accounts`, `transactions`, `loan_history` | bank-service | Simulated financial data |
-| `consent_artefacts` (local) | bank-service | Lightweight consent validation at the FIP |
-| `consent_artefacts` (master) | aggregator-service | Full consent record with JSON artefact + audit reference |
-| `data_requests` | aggregator-service | FIU-originated requests and routing status |
-| `institution_mapping` | aggregator-service | Links a customer (PAN) to accounts across banks |
-| `institutions` | aggregator-service | Registry of FIPs/FIUs with status and API key |
-| `audit_blocks` | aggregator-service | SHA-256 hash-chain audit trail |
-
----
-
-## Bank/FIP Data Model
+Tables are created and updated by Hibernate from the JPA entities (`ddl-auto: update`).
 
 ```mermaid
 erDiagram
-    Customer {
-        long id
-        string panNumber
+    AA_USERS ||--o{ LINKED_BANK_ACCOUNTS : "links"
+    AA_USERS ||--o{ CONSENTS : "grants"
+    CONSENTS ||--o{ CONSENT_DATA_SCOPES : "covers"
+    CONSENTS ||--o| AA_DATA_REQUESTS : "authorises (via consent_id)"
+    AA_USERS ||--o{ AUDIT_LOGS : "acts in (via user_id)"
+
+    AA_USERS {
+        bigint id PK
         string name
-        string mobileNumber
-        string netbankingUsername
-        string netbankingPassword
+        string email UK
+        string username UK
+        string password
+        string mobile
+        string pan_number
+        string role "ADMIN or USER"
+        datetime created_at
     }
-    Account {
-        long id
-        long customerId
-        string bankName
-        string accountNumber
+    LINKED_BANK_ACCOUNTS {
+        bigint id PK
+        bigint user_id FK
+        string bank_name
+        string account_number
+        string ifsc
+        string bank_customer_id
+        string customer_pan
+        string status
+        datetime linked_at
+    }
+    CONSENTS {
+        bigint id PK
+        string consent_id UK
+        string request_id
+        bigint user_id FK
+        string fiu_id
+        string purpose
+        date from_date
+        date to_date
+        string status "PENDING, ACTIVE, REJECTED, REVOKED, EXPIRED"
+        datetime created_at
+        datetime expires_at
+    }
+    CONSENT_DATA_SCOPES {
+        bigint consent_id FK
+        string data_scope "ACCOUNT, TRANSACTIONS, LOANS"
+    }
+    AA_DATA_REQUESTS {
+        bigint id PK
+        string request_id UK
+        bigint user_id
+        string fiu_id
+        string purpose
+        string data_scopes "comma separated"
+        date from_date
+        date to_date
+        string consent_id
+        string status
+        datetime created_at
+    }
+    AUDIT_LOGS {
+        bigint id PK
+        bigint user_id
+        string username
+        string action
+        string description
+        datetime timestamp
+    }
+```
+
+### `bank-service`: schema `bank_service_db`
+
+```mermaid
+erDiagram
+    CUSTOMERS ||--o{ ACCOUNTS : "owns"
+    ACCOUNTS ||--o{ TRANSACTIONS : "records"
+    ACCOUNTS ||--o{ LOAN_HISTORY : "has"
+
+    CUSTOMERS {
+        bigint id PK
+        string pan_number UK
+        string name
+        string mobile_number
+        string netbanking_username
+        string netbanking_password
+    }
+    ACCOUNTS {
+        bigint id PK
+        bigint customer_id FK
+        string bank_name
+        string account_number UK
         string ifsc
         decimal balance
     }
-    Transaction {
-        long id
-        long accountId
-        date transactionDate
+    TRANSACTIONS {
+        bigint id PK
+        bigint account_id FK
+        date txn_date
         string description
         decimal amount
         string type
     }
-    LoanHistory {
-        long id
-        long accountId
-        string loanType
+    LOAN_HISTORY {
+        bigint id PK
+        bigint account_id FK
+        string loan_type
         decimal amount
         string status
     }
-
-    Customer ||--o{ Account : owns
-    Account ||--o{ Transaction : has
-    Account ||--o{ LoanHistory : has
-```
-
----
-
-## Bank Service Consent Model
-
-```mermaid
-classDiagram
-    class ConsentArtefact {
-        +String consentId
-        +String purpose
-        +String dataScope
-        +DateTime validTill
-        +Status status
+    CONSENT_ARTEFACTS {
+        bigint id PK
+        string consent_id UK
+        string purpose
+        string data_scope
+        datetime valid_till
+        string status "ACTIVE, EXPIRED, REVOKED"
     }
-    class Status {
-        <<enumeration>>
-        ACTIVE
-        EXPIRED
-        REVOKED
+    DATA_REQUESTS {
+        bigint id PK
+        string request_id
+        string customer_pan
+        string purpose
+        string data_scope
+        date from_date
+        date to_date
+        string status
+        string consent_id
+        string response_data "JSON"
+        datetime created_at
     }
-    ConsentArtefact --> Status
-```
-
-The aggregator maintains the broader consent lifecycle; the FIP validates whether the consent presented for a data request is usable.
-
----
-
-## Aggregator Service — Responsibilities
-
-1. **Consent Creation** — build a consent artefact from the FIU's data request
-2. **Consent Management** — maintain states: `PENDING`, `ACTIVE`, `DENIED`, `REVOKED`, `EXPIRED`
-3. **FIU Request Handling** — receive financial data requests
-4. **FIP Identification** — determine which institution(s) hold the requested information
-5. **Customer Consent** — send the request to the customer for approval/denial
-6. **FIP Routing** — route the authorized request to relevant FIP service(s)
-7. **Data Aggregation** — consolidate data from one or more FIPs for the FIU
-8. **Revocation** — allow revocation and ensure revoked consent can't be reused
-9. **Audit Trail** — record events in the SHA-256 hash-chain
-
-### Dynamic FIP/FIU Request Model
-
-```mermaid
-classDiagram
-    class DataRequest {
-        +String requestId
-        +Long customerId
-        +Long requesterInstitutionId
-        +List~Long~ providerInstitutionIds
-        +String purpose
-        +String dataScope
-        +List~Long~ accountIds
-        +String dataPeriod
-        +String consentId
-        +String status
+    USERS {
+        bigint id PK
+        string institution_id
+        string username
+        string password "BCrypt hash"
+        string role "FIP or FIU"
+        boolean active
     }
 ```
 
----
-
-## Blockchain / Hash-Chain Audit
-
-ConsentChain uses a custom hash-chain instead of a full external blockchain network.
-
-```mermaid
-flowchart LR
-    B1["Block 1<br/>hash: H1"] -->|previousHash = H1| B2["Block 2<br/>hash: H2"]
-    B2 -->|previousHash = H2| B3["Block 3<br/>hash: H3"]
-    B3 -->|previousHash = H3| B4["Block 4<br/>hash: H4"]
-```
-
-Each `AuditBlock` stores `data/event`, `timestamp`, `hash`, and `previousHash`. Changing an earlier record breaks the subsequent hash chain.
-
-**Events to audit:** `CONSENT_CREATED`, `CONSENT_APPROVED`, `CONSENT_DENIED`, `DATA_REQUESTED`, `FIP_DATA_REQUESTED`, `DATA_RECEIVED`, `DATA_SHARED`, `CONSENT_REVOKED`, `CONSENT_EXPIRED`
+`consent_artefacts`, `data_requests` and `users` are standalone: they are linked to the rest by business identifiers (`consent_id`, `customer_pan`), not by foreign keys.
 
 ---
 
-## Revocation Flow
+## 🔬 Service Internals
 
-```mermaid
-sequenceDiagram
-    participant Cust as Customer
-    participant AA as Aggregator Service
-    Cust->>AA: My Consents → Select Active Consent → Revoke
-    AA->>AA: Consent = REVOKED
-    AA->>AA: Record audit event
-    Note over AA: Future requests using this consent are rejected
-```
+### `aggregator-service` (port 8082)
 
-The aggregator-service also handles session/request invalidation where required.
-
----
-
-## Frontend Page Structure
-
-The frontend represents the **Customer/AA experience**, not a traditional banking app. The main dashboard is an **AA dashboard**, not a bank dashboard.
-
-```mermaid
-flowchart LR
-    Login --> Signup --> Profile["Profile Setup"] --> Connect["Connect Financial Account"]
-    Connect --> Discovery["Account Discovery"] --> Dash["AA Dashboard"] --> Accounts["Connected Accounts"]
-    Accounts --> Details["Account Details<br/>(Overview / Transactions / 6-Month Statement)"]
-    Dash --> Requests["Consent Requests"] --> ConsentDetails["Consent Details"] --> Decision["Approve / Deny"]
-    Dash --> MyConsents["My Consents"] --> History["Data Access History"]
-    Dash --> Notifications --> Settings
-```
-
-**FIU Interface**
-
-```mermaid
-flowchart LR
-    FIULogin["FIU Login"] --> FIUDash["FIU Dashboard"] --> Create["Create Data Request"]
-    Create --> ReqList["Request List"] --> ReqDetails["Request Details"] --> Received["Received Authorized Data"]
-```
-
-**FIP Interface**
-
-```mermaid
-flowchart LR
-    FIPLogin["FIP Login"] --> FIPDash["FIP Dashboard"] --> DataReqs["Data Requests"]
-    DataReqs --> ReqDetails2["Request Details"] --> Validate["Validate Consent"] --> Provide["Provide Authorized Data"] --> Complete["Request Completed"]
-```
-
-The FIP does not independently create the customer's consent — it validates the applicable authorization and provides the permitted information.
-
----
-
-## Bank Simulation Options
-
-**Option 1 — Single Service (recommended):** One `bank-service`, differentiated by a `bankName` field (`HDFC`, `SBI`, `ICICI`).
-**Option 2 — Multiple Instances:** Same codebase run as separate instances — `Bank A → 8081`, `Bank B → 8082`, `Bank C → 8083`.
-
----
-
-## Service Communication
-
-```mermaid
-flowchart TD
-    FIU["FIU (Bank / Fintech)"] -->|Data Request| AA["AA (aggregator-service)"]
-    AA -->|Authorized Request via RestTemplate/WebClient| BankA["Bank A (FIP)"]
-    AA -->|Authorized Request via RestTemplate/WebClient| BankB["Bank B (FIP)"]
-    BankA -->|Data + X-AA-Token check| AA
-    BankB -->|Data + X-AA-Token check| AA
-```
-
-The aggregator-service uses `RestTemplate` or `WebClient` to communicate with the bank-service.
-
----
-
-## Security
-
-For development/testing, FIP APIs use a simple API key/token mechanism to ensure requests originate from the AA service.
-
-```http
-X-AA-Token: <AA_API_KEY>
-```
-
-See [Environment Variables](#environment-variables) for how this is configured. A production implementation would require stronger authentication, authorization, encryption, and secure key management.
-
----
-
-## What Each Developer Should Focus On
-
-**Sakshi & Bhunesh (paired) — Bank/FIP → Aggregator/AA:** Started together on `bank-service` (Customer, Account, Transaction, Loan History, Consent Validation, Fetch Data, FIP API Contract) — now complete — and continue paired into `aggregator-service` (FIU Request → Consent → Customer Approval → Consent Validation → FIP Routing → Data Aggregation → FIU Delivery → Audit Hash Chain → Revocation).
-> Bank-service should answer: *"Is this request authorized, and if yes, what financial information am I allowed to provide?"*
-> Aggregator-service should answer: *"Is there valid customer consent, which FIPs have the required data, what data is authorized, and where should the authorized data go?"*
-
-**Frontend Developer:** Customer Dashboard, Accounts, Financial Data, Consent Requests, Consent Approval, Consent Management, Revocation, Access History — plus the separate FIP and FIU role-based views described above.
-
----
-
-## What We Are NOT Building
-
-ConsentChain is a reference/simulation project, not a complete banking application. We are **not** building a real bank, real UPI/payment processing, real money transfers, real loan disbursement, a production RBI AA implementation, a production banking authentication system, or a real blockchain network.
-
-The bank-service is a simulated FIP, and the FIU is simulated by a bank or fintech. The purpose is to demonstrate the **consent-driven financial data-sharing architecture**.
-
----
-
-## Key Design Principle
-
-```mermaid
-flowchart LR
-    FIP["FIP<br/>Has / Provides the requested financial information"]
-    FIU["FIU<br/>Requests / Uses the financial information"]
-    AA["AA<br/>Manages consent and coordinates the authorized exchange"]
-    CUSTOMER["CUSTOMER<br/>Controls consent"]
-```
-
-The FIP/FIU role is determined **per request**.
-
----
-
-## Learning Goals
-
-| Concept | Why it matters |
+| Component | Responsibility |
 |---|---|
-| Spring Boot | Backend service development |
-| JPA Repository | Database access |
-| REST APIs | Service-to-service communication |
-| DTOs | API request/response structure |
-| `ResponseEntity` | HTTP status handling |
-| Exception Handling | Graceful API failures |
-| Consent State Management | Core AA business logic |
-| REST Service Integration | AA ↔ FIP communication |
-| SHA-256 | Hash-chain implementation |
-| Blockchain Concepts | Tamper-evident audit trail |
-| React | Consent/dashboard UI |
-| API Contracts | Parallel frontend/backend development |
+| `AuthService` | Register customers (always role `USER`), log in, write audit entries |
+| `AccountService` | Call the FIP's `/bank/verify-account`, prevent duplicate links, store `LinkedBankAccount` |
+| `AaDataRequestService` | Validate a new data request, create the paired `Consent` (`PENDING`) and `AaDataRequest` (`PENDING_CONSENT`) |
+| `ConsentService` | Own the consent state machine. FIP is contacted **before** local state changes on approve and revoke |
+| `DataRequestExecutionService` | Require `CONSENT_APPROVED`, fetch only the approved scopes, mark `DATA_RECEIVED`, notify the FIU |
+| `FipClientService` | `POST /fip/consents` and `PUT /fip/consents/{id}/revoke` with `X-AA-Token` |
+| `FipDataService` | `POST /fip/data/account`, `/transactions`, `/loans` with `X-AA-Token` |
+| `FiuClientService` | `POST /fiu/data-request/{id}/result` back to the FIU |
+| `AuditService` | Persist an `AuditLog` row (user, action, description, timestamp) |
+
+### `bank-service` (port 8081)
+
+| Component | Responsibility |
+|---|---|
+| `ApiKeyFilter` | Requires a matching `X-AA-Token` on `/bank/validate-consent`, `/bank/fetch-data`, `/bank/fetch-statement`, `/bank/loan-history`, `/fip/consents*`, `/fip/data/*`. Missing or wrong key → `401` |
+| `FipConsentService` | Register a consent artefact (`ACTIVE`, future `validTill`, no duplicates) and revoke it |
+| `FipDataService` | Validate the consent on every call, then return account, transaction or loan data |
+| `BankController` | Health check, direct consent validation, Base64-encoded account snapshot, statements, loan history, account verification |
+| `FiuDataRequestService` | Create a data request (`REQ-XXXXXXXX`, `CONSENT_REQUIRED`), receive and store results from the AA |
+| `AuthService` | Register and log in FIP / FIU institution users, passwords stored with BCrypt |
 
 ---
 
-## Development Guidelines
+## 📡 API Reference
 
-- Use **Java 21** consistently across all backend modules.
-- Keep controllers thin and business logic inside services.
-- Keep repository/database logic separate from controllers.
-- Keep seed data separate from controllers (own file, e.g. `DataSeeder.java`).
-- Follow endpoint naming conventions: `/bank/<action>`, `/aggregator/<action>`.
-- Keep API contracts updated when request/response structures change.
-- Commit small, working increments.
-- Do not commit `.idea/` — it's in `.gitignore`.
-- Use feature branches: `feature/<your-module>` → PR into `main` when ready.
-- Set `DB_USERNAME`, `DB_PASSWORD`, and `AA_API_KEY` locally (see [Environment Variables](#environment-variables)) — use your own MySQL setup, don't share credentials.
+All bodies are JSON unless noted. 🔒 means the call requires the `X-AA-Token` header.
+
+### Aggregator Service: `http://localhost:8082`
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/aa/auth/register` | Register a customer |
+| `POST` | `/aa/auth/login` | Log in |
+| `POST` | `/aa/accounts/link` | Verify and link a bank account via the FIP |
+| `GET` | `/aa/accounts/{userId}` | List a customer's linked accounts |
+| `POST` | `/aa/data-requests` | Create a data request and its pending consent |
+| `GET` | `/aa/data-requests/{requestId}` | Fetch a data request |
+| `POST` | `/aa/data-requests/{requestId}/execute?accountNumber=` | Fetch data from the FIP for an approved request and notify the FIU |
+| `POST` | `/aa/consents` | Create a consent directly |
+| `GET` | `/aa/consents/user/{userId}` | List a customer's consents |
+| `GET` | `/aa/consents/{consentId}` | Fetch one consent |
+| `PUT` | `/aa/consents/{consentId}/approve` | Approve (registers at the FIP first) |
+| `PUT` | `/aa/consents/{consentId}/reject` | Reject a pending consent |
+| `PUT` | `/aa/consents/{consentId}/revoke` | Revoke an active consent (revokes at the FIP first) |
+| `POST` | `/aa/data/account` · `/aa/data/transactions` · `/aa/data/loans` | Proxy a scoped fetch to the FIP (`accountNumber`, `consentId` query params) |
+| `GET` | `/aa/admin/users` · `/accounts` · `/consents` · `/audit-logs` | Admin listings |
+
+**Create a data request**
+
+```json
+POST /aa/data-requests
+{
+  "requestId": "REQ-1A2B3C4D",
+  "userId": 1,
+  "fiuId": "FIU-001",
+  "purpose": "Loan Application",
+  "dataScopes": ["ACCOUNT", "TRANSACTIONS", "LOANS"],
+  "fromDate": "2026-01-01",
+  "toDate": "2026-06-30"
+}
+```
+
+### Bank Service: `http://localhost:8081`
+
+**FIP / bank endpoints**
+
+| Method | Endpoint | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/bank/health-check` | none | Liveness |
+| `POST` | `/bank/verify-account` | none | Verify net-banking credentials and return the linked account |
+| `POST` | `/bank/validate-consent` | 🔒 | Check a consent is `ACTIVE` and unexpired |
+| `POST` | `/bank/fetch-data?accountNumber=&consentId=` | 🔒 | Account snapshot, Base64-encoded |
+| `POST` | `/bank/fetch-statement?accountNumber=&consentId=&fromDate=&toDate=` | 🔒 | Transactions, optional date range |
+| `GET` | `/bank/loan-history/{accountNumber}` | 🔒 | Loan history |
+| `POST` | `/fip/consents` | 🔒 | Register a consent artefact |
+| `PUT` | `/fip/consents/{consentId}/revoke` | 🔒 | Revoke a consent artefact |
+| `POST` | `/fip/data/account` · `/transactions` · `/loans` | 🔒 | Consent-validated data release (`accountNumber`, `consentId`) |
+
+**FIU endpoints**
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/fiu/data-request` | Create a request (`customerPan`, `purpose`, `dataScope`, `fromDate`, `toDate` are required) |
+| `GET` | `/fiu/data-request/{requestId}` | Read a request and any delivered data |
+| `POST` | `/fiu/data-request/{requestId}/result` | Callback used by the AA to deliver status and data |
+
+**Institution auth**
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/auth/register` | Register a FIP / FIU institution user |
+| `POST` | `/auth/login` | Log in |
+
+**Status codes on `/bank/*` consent checks**
+
+| Code | Meaning |
+|---|---|
+| `200` | Success |
+| `400` | Consent expired or revoked |
+| `401` | Missing or invalid `X-AA-Token` |
+| `403` | Consent invalid, data not shared |
+| `404` | Consent not found |
+
+Detailed request and response shapes for the original `/bank/*` endpoints are in [`docs/api-contracts.md`](docs/api-contracts.md).
 
 ---
 
-## How to Run
+## 🔐 Security Model
 
-**Bank Service**
+Honest status of what is enforced today and what is planned. This is a reference implementation, and the table is meant to make its boundaries clear.
+
+| Area | Status | Details |
+|---|---|---|
+| Consent enforcement at the FIP | ✅ Implemented | Existence, `ACTIVE` status and `validTill` are checked on every data call |
+| AA → FIP authentication | ✅ Implemented | Shared secret in `X-AA-Token`, enforced by `ApiKeyFilter` |
+| Institution password storage (`bank-service /auth`) | ✅ Implemented | BCrypt via `spring-security-crypto` |
+| Atomic consent changes across services | ✅ Implemented | FIP is updated first, AA state changes only on success |
+| Customer password storage (`aggregator-service`) | ⚠️ Plaintext | Needs BCrypt before any real use |
+| Session / token auth on AA endpoints | ⚠️ Not yet | No JWT or Spring Security in `aggregator-service`; `/aa/**` is open |
+| Role enforcement on `/aa/admin/**` | ⚠️ Not yet | Admin listings are unauthenticated and return full entities |
+| FIU callback authentication | ⚠️ Not yet | `/fiu/**` has no API-key check |
+| Payload protection | ⚠️ Simulated | `/bank/fetch-data` uses **Base64 encoding**, which is an encoding, not encryption |
+| Secrets management | ⚠️ In config | DB credentials and the API key are committed in `application.yml`; override them with environment variables |
+| Transport security | ⚠️ HTTP | Local development uses plain HTTP; use TLS in any shared environment |
+
+---
+
+## ⛓ Audit Trail and Hash-Chain Ledger
+
+**Live today.** Every important action is written to the append-only `audit_logs` table by `AuditService`:
+
+`USER_REGISTERED` · `USER_LOGIN` · `BANK_LINKED` · `CONSENT_CREATED` · `CONSENT_APPROVED` · `CONSENT_REJECTED` · `CONSENT_REVOKED`
+
+Entries can be read through `GET /aa/admin/audit-logs`.
+
+**Planned.** The ledger that gives the project its name. The `audit_blocks` table (`event`, `data`, `timestamp`, `hash`, `previous_hash`) is defined in `docs/databaseScripts/aggregator_table_scheme.sql`, but the hashing and chaining logic is not implemented in the services yet. The intended design:
+
+```mermaid
+flowchart TB
+    EV["Consent event<br/>(created, approved, rejected, revoked)"]
+    PAY["Canonical payload<br/>event + data + timestamp"]
+    PREV["Read latest block<br/>→ previous_hash<br/>(genesis uses a fixed seed)"]
+    HASH["hash = SHA-256( previous_hash + payload )"]
+    SAVE[("audit_blocks<br/>append only")]
+    VERIFY["Verification job<br/>recompute every hash<br/>and compare links"]
+    OK{"Chain intact?"}
+    GOOD["Audit trail trusted"]
+    BAD["Tamper detected at block N"]
+
+    EV --> PAY --> PREV --> HASH --> SAVE
+    SAVE --> VERIFY --> OK
+    OK -- yes --> GOOD
+    OK -- no --> BAD
+
+    classDef planned fill:#f7f7f7,stroke:#999,stroke-dasharray: 5 5,color:#333;
+    class PAY,PREV,HASH,SAVE,VERIFY,OK,GOOD,BAD planned;
+```
+
+```mermaid
+flowchart LR
+    G["Block 0<br/>prev: GENESIS<br/>hash: h0"] --> B1["Block 1<br/>prev: h0<br/>hash: h1"] --> B2["Block 2<br/>prev: h1<br/>hash: h2"] --> B3["Block 3<br/>prev: h2<br/>hash: h3"]
+
+    classDef planned fill:#f7f7f7,stroke:#999,stroke-dasharray: 5 5,color:#333;
+    class G,B1,B2,B3 planned;
+```
+
+Changing any past block changes its hash, which breaks every later `previous_hash` link, so tampering becomes detectable. This is an enhancement layered **on top of** the AA framework: RBI's AA specification does not require a blockchain.
+
+---
+
+## 🧰 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Language / runtime | Java 21 |
+| Framework | Spring Boot 3.3.4 (Spring Web, Spring Data JPA, Bean Validation in `bank-service`) |
+| Persistence | Hibernate / JPA, MySQL (Connector/J) |
+| Service-to-service HTTP | Spring `RestTemplate` |
+| Password hashing | `spring-security-crypto` (BCrypt) in `bank-service` |
+| Boilerplate | Lombok |
+| Build | Maven (wrapper included in both services) |
+| Frontend (feature branch) | React 19, Vite 8, Tailwind CSS 3, React Router 7, react-icons |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- JDK **21**
+- MySQL **8** running on `localhost:3306`
+- Git
+
+### 1. Clone
+
 ```bash
+git clone https://github.com/sakshi048/consent-chain.git
+cd consent-chain
+```
+
+### 2. Prepare the databases
+
+**Bank service.** Create the schema and load demo customers, accounts, transactions, loans and a sample consent artefact:
+
+```bash
+mysql -u root -p < docs/databaseScripts/bank_service_table_scheme.sql
+mysql -u root -p < docs/databaseScripts/bank_data_seed.sql
+```
+
+The `users` and `data_requests` tables are created by Hibernate on first start.
+
+**Aggregator service.** Only the database itself is needed. Hibernate creates the tables from the entities:
+
+```bash
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS aggregator_service_db;"
+```
+
+> `aggregator_table_scheme.sql` and `aggregator_data_seed.sql` describe an earlier table design (`consent_artefacts`, `institutions`, `audit_blocks`, …). Most of those tables are not used by the current entities, so they are optional.
+
+### 3. Set the runtime configuration
+
+The committed `application.yml` files contain development defaults. Override them with environment variables instead of editing the files:
+
+```bash
+# Bank service (terminal 1)
+export SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/bank_service_db
+export SPRING_DATASOURCE_USERNAME=root
+export SPRING_DATASOURCE_PASSWORD=<your-mysql-password>
+export BANK_AA_API_KEY=<shared-secret>
+```
+
+```bash
+# Aggregator service (terminal 2)
+export SPRING_DATASOURCE_USERNAME=root
+export SPRING_DATASOURCE_PASSWORD=<your-mysql-password>
+export FIP_AA_API_KEY=<shared-secret>          # must equal BANK_AA_API_KEY
+export FIU_BASE_URL=http://localhost:8081      # required, see note below
+```
+
+> **Required property.** `FiuClientService` reads `fiu.base-url`, which is not defined in the committed `aggregator-service/src/main/resources/application.yml`. Without `FIU_BASE_URL` (or adding `fiu.base-url: http://localhost:8081` to the file) the aggregator fails to start. The FIU module lives inside `bank-service`, so it points at port 8081.
+
+The bank service's committed datasource URL points at `consentchain_auth`, whereas the SQL scripts create `bank_service_db`. Setting `SPRING_DATASOURCE_URL` as above keeps them aligned.
+
+### 4. Run
+
+```bash
+# Terminal 1: FIP + FIU on :8081
 cd bank-service
 ./mvnw spring-boot:run
 ```
-`http://localhost:8081` | MySQL database: `bank_service_db` (`spring.datasource.url=jdbc:mysql://localhost:3306/bank_service_db`)
 
-**Aggregator Service**
 ```bash
+# Terminal 2: Account Aggregator on :8082
 cd aggregator-service
 ./mvnw spring-boot:run
 ```
-`http://localhost:8082` | MySQL database: `aggregator_service_db`
+
+### 5. Smoke test
+
+```bash
+curl http://localhost:8081/bank/health-check
+# → Bank service is up
+
+# FIP rejects calls without the shared secret
+curl -i -X POST "http://localhost:8081/bank/validate-consent" \
+     -H "Content-Type: application/json" \
+     -d '{"consentId":"x"}'
+# → 401 Unauthorized
+
+# Register a customer at the AA
+curl -X POST http://localhost:8082/aa/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Demo User","email":"demo@example.com","username":"demo","password":"demo@123","mobile":"9999999999","panNumber":"ABCPL1234D"}'
+```
+
+Then follow the [consent flow](#2-consent-request--approval--data-delivery): link a bank account, create a data request, approve the consent, and execute the request.
+
+### Optional: frontend (feature branch)
+
+The React UI lives on `feature/frontend-and-setup` and has not been merged into `main`.
+
+```bash
+git checkout feature/frontend-and-setup
+cd frontend
+npm install
+npm run dev
+```
 
 ---
 
-## Final Architecture
+## ⚙ Configuration
 
-```mermaid
-flowchart TD
-    Cust["CUSTOMER"] --> FE["React Frontend<br/>Customer / AA UI"]
-    FE --> AA["Aggregator Service (AA)<br/>Consent Broker · Request Routing<br/>Revocation · Audit Hash Chain"]
-    AA --> FipA["Bank/FIP A<br/>Accounts · Transactions"]
-    AA --> FipB["Bank/FIP B<br/>Accounts · Transactions"]
-    FipA --> AA
-    FipB --> AA
-    AA --> FIU["FIU<br/>Bank/Fintech · Data User"]
-```
+| Service | Property | Default in repo | Environment override |
+|---|---|---|---|
+| both | `spring.datasource.url` | aggregator: `jdbc:mysql://localhost:3306/aggregator_service_db`, bank: `…/consentchain_auth` | `SPRING_DATASOURCE_URL` |
+| both | `spring.datasource.username` / `password` | `root` / development value | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` |
+| both | `spring.jpa.hibernate.ddl-auto` | `update` | `SPRING_JPA_HIBERNATE_DDL_AUTO` |
+| bank | `server.port` | `8081` | `SERVER_PORT` |
+| bank | `bank.aa-api-key` | development value | `BANK_AA_API_KEY` |
+| aggregator | `server.port` | `8082` | `SERVER_PORT` |
+| aggregator | `fip.base-url` | `http://localhost:8081` | `FIP_BASE_URL` |
+| aggregator | `fip.aa-api-key` | development value | `FIP_AA_API_KEY` |
+| aggregator | `fiu.base-url` | **not set**, must be provided | `FIU_BASE_URL` |
 
-See also the full page-flow infographic: `docs/Account Aggregator System Flow Infographic.png` (referenced in the [System Flow](#system-flow) section above).
+The two API keys must match, otherwise every AA → FIP call is rejected with `401`.
 
 ---
 
-## Final Project Story
+## 📁 Repository Layout
 
-> A customer applies for a financial service such as a loan. The requesting institution (FIU) needs financial information held by one or more institutions (FIPs). Instead of directly sharing credentials or financial data, the request passes through the Account Aggregator. The customer reviews the purpose, requested data, accounts, period, and validity before giving consent. Once approved, the AA coordinates authorized data retrieval from the relevant FIPs and delivers the permitted information to the FIU. Every important consent and data-sharing event is recorded in the tamper-evident audit trail, and the customer can revoke consent later.
-
-**Core flow:**
-
-```mermaid
-flowchart LR
-    FIURequest["FIU Request"] --> ConsentRequest["AA Consent Request"] --> Approval["Customer Approval"] --> Active["Active Consent"]
-    Active --> FIPRetrieval["FIP Data Retrieval"] --> Aggregation["AA Aggregation / Routing"] --> Delivery["FIU Receives Authorized Data"]
-    Delivery --> Audit["Audit Trail"] --> Lifecycle["Consent Revocation / Expiry"]
+```text
+consent-chain/
+├── aggregator-service/                  # Account Aggregator (port 8082)
+│   └── src/main/java/com/consentchain/aggregatorservice/
+│       ├── controller/                  # auth, accounts, consents, data-requests, data, admin
+│       ├── service/                     # consent state machine, execution, FIP/FIU clients, audit
+│       ├── model/                       # entities and status enums
+│       ├── repository/                  # Spring Data JPA
+│       ├── dto/                         # request / response objects
+│       └── config/                      # RestTemplate bean
+├── bank-service/                        # FIP + FIU (port 8081)
+│   └── src/main/java/com/consentchain/bankservice/
+│       ├── controller/                  # bank, fip consents, fip data, fiu, auth
+│       ├── service/                     # consent registry, data release, FIU requests, auth
+│       ├── filter/                      # ApiKeyFilter (X-AA-Token)
+│       ├── model/                       # customers, accounts, transactions, loans, artefacts
+│       ├── repository/
+│       ├── dto/
+│       └── config/                      # BCrypt password encoder
+├── docs/
+│   ├── api-contracts.md                 # bank endpoint contracts
+│   ├── Account Aggregator System Flow Infographic.png
+│   ├── databaseScripts/                 # schema + seed SQL, database specification
+│   └── readmeFiles/CHANGELOG.md         # development log
+└── README.md
 ```
+
+---
+
+## 🗺 Project Status and Roadmap
+
+### Delivered
+
+- [x] FIP: consent registry, consent-validated data release, statements, loan history, account verification
+- [x] FIU: request creation and result callback storage
+- [x] AA: registration, login, bank linking, consent create / approve / reject / revoke, data request execution
+- [x] Cross-service consent sync with fail-safe ordering
+- [x] `X-AA-Token` protection on all FIP data and consent endpoints
+- [x] `audit_logs` trail for user and consent events
+- [x] MySQL schemas and demo seed data
+
+### In progress
+
+- [ ] React dashboard: customer, FIP and FIU screens exist on `feature/frontend-and-setup` and need to be wired to the AA endpoints and merged to `main`
+
+### Next
+
+- [ ] **SHA-256 hash-chained ledger** (`audit_blocks`) with a chain-verification endpoint
+- [ ] JWT authentication and role-based authorisation for `/aa/**`, including `/aa/admin/**`
+- [ ] BCrypt for AA customer passwords
+- [ ] Server-side FIU → AA request forwarding
+- [ ] Scheduled consent expiry (`EXPIRED`) at the AA
+- [ ] Real payload encryption to replace Base64
+- [ ] Global exception handling with typed errors and consistent status codes
+- [ ] Unit and integration tests for consent validation, expiry and revocation
+- [ ] Externalised secrets and Dockerised local setup
+
+---
+
+<div align="center">
+
+**ConsentChain** · Java 21 · Spring Boot 3.3.4 · MySQL
+
+Repository: [`sakshi048/consent-chain`](https://github.com/sakshi048/consent-chain)
+
+</div>
