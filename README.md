@@ -20,7 +20,7 @@
 ![Tailwind](https://img.shields.io/badge/Tailwind-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Backend](https://img.shields.io/badge/backend-functional-brightgreen?style=flat-square)
 ![Frontend](https://img.shields.io/badge/frontend-in%20progress-yellow?style=flat-square)
-![Hash Chain](https://img.shields.io/badge/hash--chain%20ledger-planned-lightgrey?style=flat-square)
+![Besu QBFT](https://img.shields.io/badge/Besu-QBFT%20audit%20ledger-brightgreen?style=flat-square)
 
 </div>
 
@@ -58,7 +58,7 @@ India's **Account Aggregator** framework, defined by the RBI, lets a customer sh
 
 ConsentChain implements this three-party model end to end as two Spring Boot applications backed by MySQL: a customer registers with the AA, links a bank account, approves or rejects a consent request, and an FIU receives the data only after the consent is active. Revoking a consent propagates to the FIP, which then refuses further access.
 
-> **Why "Chain"?** The project is designed around a tamper-evident, SHA-256 hash-chained audit ledger for consent events. The `audit_blocks` schema exists, and the current build records an append-only `audit_logs` trail. See [Audit Trail and Hash-Chain Ledger](#-audit-trail-and-hash-chain-ledger) for exactly what is live and what is planned.
+> **Why "Chain"?** The project records consent decisions in MySQL and can optionally anchor keyed consent commitments to a local Hyperledger Besu QBFT network. The chain stores no personal or financial data; the FIP still checks its own consent record before data release. The separate SHA-256 `audit_blocks` design remains documented under [Audit Trail and Hash-Chain Ledger](#-audit-trail-and-hash-chain-ledger).
 
 ---
 
@@ -1129,3 +1129,9 @@ Repository: [`sakshi048/consent-chain`](https://github.com/sakshi048/consent-cha
 - Endpoint naming convention: `/bank/<action>`, `/aggregator/<action>`
 - Commit small, working increments — don't wait to finish everything before pushing
 >>>>>>> efe59f5c22482c0cc6cae41be352ed9a8b0180cc
+
+## Local blockchain consent audit (Besu QBFT)
+
+The AA can optionally anchor keyed consent lifecycle commitments to a locally run four-validator Hyperledger Besu QBFT network. The events are `CREATED`, `APPROVED`, `REJECTED`, and `REVOKED`. No personal or financial data is stored on-chain, and the FIP continues to independently validate its own consent record before releasing data. The AA's MySQL outbox retries blockchain writes without making consent access depend on Besu availability.
+
+See [docs/blockchain-setup.md](docs/blockchain-setup.md) for the local network, contract deployment, Spring Boot configuration, API flow, and proof verification commands. The local network and publicly known demo key are for development only.

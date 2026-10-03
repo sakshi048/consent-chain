@@ -1,0 +1,7 @@
+node_modules/
+artifacts/
+cache/
+.npm-cache/
+.test-appdata/
+.test-localappdata/
+audit-report.json

@@ -24,3 +24,5 @@ Thumbs.db
 
 # Logs
 *.log
+# Temporary local verification cache
+.maven-cache/

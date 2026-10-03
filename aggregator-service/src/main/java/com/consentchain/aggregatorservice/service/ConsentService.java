@@ -1,6 +1,7 @@
 package com.consentchain.aggregatorservice.service;
 
 import com.consentchain.aggregatorservice.model.AaDataRequest;
+import com.consentchain.aggregatorservice.model.BlockchainConsentEventType;
 import com.consentchain.aggregatorservice.model.AuditAction;
 import com.consentchain.aggregatorservice.model.Consent;
 import com.consentchain.aggregatorservice.model.ConsentStatus;
@@ -24,19 +25,22 @@ public class ConsentService {
     private final AuditService auditService;
     private final FipClientService fipClientService;
     private final AaDataRequestRepository dataRequestRepository;
+    private final BlockchainAuditService blockchainAuditService;
 
     public ConsentService(
             ConsentRepository consentRepository,
             UserRepository userRepository,
             AuditService auditService,
             FipClientService fipClientService,
-            AaDataRequestRepository dataRequestRepository) {
+            AaDataRequestRepository dataRequestRepository,
+            BlockchainAuditService blockchainAuditService) {
 
         this.consentRepository = consentRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
         this.fipClientService = fipClientService;
         this.dataRequestRepository = dataRequestRepository;
+        this.blockchainAuditService = blockchainAuditService;
     }
 
     // =========================================================
@@ -187,6 +191,7 @@ public class ConsentService {
                 AuditAction.CONSENT_CREATED,
                 "Created consent "
                         + saved.getConsentId());
+        blockchainAuditService.queueConsentEvent(saved, BlockchainConsentEventType.CREATED);
 
         return saved;
     }
@@ -312,6 +317,7 @@ public class ConsentService {
                 "Approved consent "
                         + consent.getConsentId()
                         + " and registered it at FIP");
+        blockchainAuditService.queueConsentEvent(saved, BlockchainConsentEventType.APPROVED);
 
         return saved;
     }
@@ -385,6 +391,7 @@ public class ConsentService {
                 AuditAction.CONSENT_REJECTED,
                 "Rejected consent "
                         + consent.getConsentId());
+        blockchainAuditService.queueConsentEvent(saved, BlockchainConsentEventType.REJECTED);
 
         return saved;
     }
@@ -480,6 +487,7 @@ public class ConsentService {
                 "Revoked consent "
                         + consent.getConsentId()
                         + " at FIP");
+        blockchainAuditService.queueConsentEvent(saved, BlockchainConsentEventType.REVOKED);
 
         return saved;
     }

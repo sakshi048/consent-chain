@@ -3,9 +3,9 @@ spring:
     name: aggregator-service
 
   datasource:
-    url: jdbc:mysql://localhost:3306/aggregator_service_db
-    username: root
-    password: 1234
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -17,5 +17,16 @@ server:
   port: 8082
 
 fip:
-  base-url: http://localhost:8081
-  aa-api-key: AA-SECRET-123
+  base-url: ${FIP_BASE_URL}
+  aa-api-key: ${FIP_AA_API_KEY}
+
+blockchain:
+  enabled: ${BLOCKCHAIN_ENABLED:false}
+  rpc-url: ${BLOCKCHAIN_RPC_URL:http://localhost:8545}
+  chain-id: ${BLOCKCHAIN_CHAIN_ID:1337}
+  contract-address: ${BLOCKCHAIN_CONTRACT_ADDRESS:}
+  private-key: ${BLOCKCHAIN_PRIVATE_KEY:}
+  audit-hmac-secret: ${BLOCKCHAIN_AUDIT_HMAC_SECRET:}
+  poll-delay-ms: ${BLOCKCHAIN_POLL_DELAY_MS:5000}
+  gas-price-wei: ${BLOCKCHAIN_GAS_PRICE_WEI:1000000000}
+  gas-limit: ${BLOCKCHAIN_GAS_LIMIT:300000}
