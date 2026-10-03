@@ -1,4 +1,17 @@
 # Consent Chain
+### Consent-led financial data sharing, with verifiable lifecycle proofs
+
+**FIP · FIU · Account Aggregator · MySQL · Hyperledger Besu QBFT**
+
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot 3.3.4](https://img.shields.io/badge/Spring%20Boot-3.3.4-6DB33F?style=flat-square&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![MySQL 8](https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Besu QBFT](https://img.shields.io/badge/Besu-QBFT-2B6CB0?style=flat-square)](https://besu.hyperledger.org/)
+[![Local demo](https://img.shields.io/badge/Network-local%20only-7952B3?style=flat-square)](#4-technical-requirements--prerequisites)
+
+> **The chain is an audit layer.** It does not replace AA consent handling or the FIP's independent consent check. Personal and financial data stay off-chain.
+
+</div>
 
 ## 1. Project Overview
 
