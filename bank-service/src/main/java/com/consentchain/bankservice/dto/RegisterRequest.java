@@ -1,10 +1,12 @@
 package com.consentchain.bankservice.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.consentchain.bankservice.model.Role;
 
 public class RegisterRequest {
     private String institutionId;
     private String username;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private Role role;
 

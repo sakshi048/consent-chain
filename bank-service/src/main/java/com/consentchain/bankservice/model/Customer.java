@@ -1,9 +1,11 @@
 package com.consentchain.bankservice.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Entity
 @Table(name = "customers")
@@ -28,5 +30,7 @@ public class Customer {
     private String netbankingUsername;
 
     @Column(name = "netbanking_password")
+    @JsonIgnore
+    @ToString.Exclude
     private String netbankingPassword;
 }

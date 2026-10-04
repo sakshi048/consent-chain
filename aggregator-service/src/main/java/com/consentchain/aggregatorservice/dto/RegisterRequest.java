@@ -1,10 +1,13 @@
 package com.consentchain.aggregatorservice.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class RegisterRequest {
 
     private String name;
     private String email;
     private String username;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private String mobile;
     private String panNumber;

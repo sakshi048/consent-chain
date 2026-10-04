@@ -26,6 +26,9 @@ public class BlockchainAuditEvent {
     @Column(name = "commitment_hash", nullable = false, length = 66)
     private String commitmentHash;
 
+    @Column(name = "canonical_payload", columnDefinition = "TEXT")
+    private String canonicalPayload;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private BlockchainAuditStatus status = BlockchainAuditStatus.PENDING;
@@ -49,11 +52,18 @@ public class BlockchainAuditEvent {
 
     public BlockchainAuditEvent(String consentId, BlockchainConsentEventType eventType, String eventKey,
                                 String consentReference, String commitmentHash, LocalDateTime createdAt) {
+        this(consentId, eventType, eventKey, consentReference, commitmentHash, null, createdAt);
+    }
+
+    public BlockchainAuditEvent(String consentId, BlockchainConsentEventType eventType, String eventKey,
+                                String consentReference, String commitmentHash, String canonicalPayload,
+                                LocalDateTime createdAt) {
         this.consentId = consentId;
         this.eventType = eventType;
         this.eventKey = eventKey;
         this.consentReference = consentReference;
         this.commitmentHash = commitmentHash;
+        this.canonicalPayload = canonicalPayload;
         this.createdAt = createdAt;
         this.updatedAt = createdAt;
         this.status = BlockchainAuditStatus.PENDING;
@@ -65,6 +75,7 @@ public class BlockchainAuditEvent {
     public String getEventKey() { return eventKey; }
     public String getConsentReference() { return consentReference; }
     public String getCommitmentHash() { return commitmentHash; }
+    public String getCanonicalPayload() { return canonicalPayload; }
     public BlockchainAuditStatus getStatus() { return status; }
     public String getTransactionHash() { return transactionHash; }
     public int getAttempts() { return attempts; }

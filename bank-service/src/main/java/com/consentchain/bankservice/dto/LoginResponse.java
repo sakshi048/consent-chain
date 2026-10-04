@@ -7,6 +7,7 @@ public class LoginResponse {
     private String institutionId;
     private String username;
     private String role;
+    private String accessToken;
 
     public LoginResponse(
             boolean success,
@@ -16,12 +17,18 @@ public class LoginResponse {
             String username,
             String role
     ) {
+        this(success, message, userId, institutionId, username, role, null);
+    }
+
+    public LoginResponse(boolean success, String message, Long userId, String institutionId,
+                         String username, String role, String accessToken) {
         this.success = success;
         this.message = message;
         this.userId = userId;
         this.institutionId = institutionId;
         this.username = username;
         this.role = role;
+        this.accessToken = accessToken;
     }
 
     public boolean isSuccess() {
@@ -46,5 +53,9 @@ public class LoginResponse {
 
     public String getRole() {
         return role;
+    }
+
+    public String getAccessToken() {
+        return accessToken;
     }
 }

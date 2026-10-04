@@ -9,6 +9,8 @@ public class AaDataRequestCreateRequest {
 
     private Long userId;
 
+    private String customerPan;
+
     private String fiuId;
 
     private String purpose;
@@ -33,6 +35,14 @@ public class AaDataRequestCreateRequest {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public String getCustomerPan() {
+        return customerPan;
+    }
+
+    public void setCustomerPan(String customerPan) {
+        this.customerPan = customerPan;
     }
 
     public String getFiuId() {

@@ -3,8 +3,12 @@ package com.consentchain.bankservice.controller;
 import com.consentchain.bankservice.dto.ConsentValidationRequest;
 import com.consentchain.bankservice.dto.ConsentValidationResponse;
 import com.consentchain.bankservice.dto.VerifyAccountRequest;
+import com.consentchain.bankservice.dto.VerifyAccountResponse;
+import com.consentchain.bankservice.dto.VerifiedBankAccount;
 import com.consentchain.bankservice.model.*;
 import com.consentchain.bankservice.repository.*;
+import com.consentchain.bankservice.service.ServiceToServiceAuthService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -31,17 +35,23 @@ public class BankController {
     private final TransactionRepository transactionRepository;
     private final LoanHistoryRepository loanHistoryRepository;
     private final CustomerRepository customerRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final ServiceToServiceAuthService serviceAuthService;
 
     public BankController(ConsentArtefactRepository consentArtefactRepository,
                           AccountRepository accountRepository,
                           CustomerRepository customerRepository,
                           TransactionRepository transactionRepository,
-                          LoanHistoryRepository loanHistoryRepository) {
+                          LoanHistoryRepository loanHistoryRepository,
+                          PasswordEncoder passwordEncoder,
+                          ServiceToServiceAuthService serviceAuthService) {
         this.consentArtefactRepository = consentArtefactRepository;
         this.accountRepository = accountRepository;
         this.customerRepository = customerRepository;
         this.transactionRepository = transactionRepository;
         this.loanHistoryRepository = loanHistoryRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.serviceAuthService = serviceAuthService;
     }
 
     // Shared helper: re-validate consent before releasing any data
@@ -174,8 +184,11 @@ public class BankController {
         return ResponseEntity.ok(loans);
     }
     @PostMapping("/verify-account")
-    public ResponseEntity<?> verifyAccount(
+    public ResponseEntity<VerifyAccountResponse> verifyAccount(
+            @RequestHeader(value = ServiceToServiceAuthService.HEADER_NAME, required = false) String serviceToken,
             @RequestBody VerifyAccountRequest request) {
+
+        serviceAuthService.requireAggregator(serviceToken);
 
         log.info("Account verification request received for username={}",
                 request.getUsername());
@@ -186,26 +199,15 @@ public class BankController {
                         request.getUsername());
 
         if (customerOpt.isEmpty()) {
-            return ResponseEntity.ok(
-                    Map.of(
-                            "verified", false,
-                            "message", "Customer not found"
-                    )
-            );
+            return ResponseEntity.ok(new VerifyAccountResponse(false, "Customer not found", null, null, null, List.of()));
         }
 
         Customer customer = customerOpt.get();
 
         // 2. Verify password
-        if (!customer.getNetbankingPassword()
-                .equals(request.getPassword())) {
+        if (!verifyAndUpgradeCustomerPassword(customer, request.getPassword())) {
 
-            return ResponseEntity.ok(
-                    Map.of(
-                            "verified", false,
-                            "message", "Invalid bank credentials"
-                    )
-            );
+            return ResponseEntity.ok(new VerifyAccountResponse(false, "Invalid bank credentials", null, null, null, List.of()));
         }
 
         // 3. Find customer's bank accounts
@@ -214,29 +216,40 @@ public class BankController {
                         customer.getId());
 
         if (accounts.isEmpty()) {
-            return ResponseEntity.ok(
-                    Map.of(
-                            "verified", false,
-                            "message", "No bank account found"
-                    )
-            );
+            return ResponseEntity.ok(new VerifyAccountResponse(false, "No bank account found", null, null, null, List.of()));
         }
 
-        // For now use the first account
-        Account account = accounts.get(0);
+        if (request.getBankAccountId() != null) {
+            Account selected = accounts.stream()
+                    .filter(account -> request.getBankAccountId().equals(account.getId()))
+                    .findFirst().orElse(null);
+            if (selected == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new VerifyAccountResponse(false, "Selected account does not belong to verified customer", null, null, null, List.of()));
+            }
+            accounts = List.of(selected);
+        }
 
-        // 4. Return verified account information
-        return ResponseEntity.ok(
-                Map.of(
-                        "verified", true,
-                        "customerId", customer.getId(),
-                        "customerName", customer.getName(),
-                        "panNumber", customer.getPanNumber(),
-                        "bankName", account.getBankName(),
-                        "accountNumber", account.getAccountNumber(),
-                        "ifsc", account.getIfsc()
-                )
-        );
+        List<VerifiedBankAccount> verifiedAccounts = accounts.stream()
+                .map(account -> new VerifiedBankAccount(account.getId(), account.getBankName(),
+                        account.getAccountNumber(), account.getIfsc()))
+                .toList();
+        return ResponseEntity.ok(new VerifyAccountResponse(true, "Bank credentials verified",
+                customer.getId(), customer.getName(), customer.getPanNumber(), verifiedAccounts));
+    }
+
+    private boolean verifyAndUpgradeCustomerPassword(Customer customer, String rawPassword) {
+        if (rawPassword == null || customer.getNetbankingPassword() == null) return false;
+        String stored = customer.getNetbankingPassword();
+        if (stored.matches("^\\$2[aby]\\$[0-9]{2}\\$.*")) {
+            return passwordEncoder.matches(rawPassword, stored);
+        }
+        if (!java.security.MessageDigest.isEqual(stored.getBytes(StandardCharsets.UTF_8), rawPassword.getBytes(StandardCharsets.UTF_8))) {
+            return false;
+        }
+        customer.setNetbankingPassword(passwordEncoder.encode(rawPassword));
+        customerRepository.save(customer);
+        return true;
     }
 
 }

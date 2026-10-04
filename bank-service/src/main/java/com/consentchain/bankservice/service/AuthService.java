@@ -12,10 +12,12 @@ import org.springframework.stereotype.Service;
 public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AccessTokenService accessTokenService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, AccessTokenService accessTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.accessTokenService = accessTokenService;
     }
 
     public String register(RegisterRequest request) {
@@ -105,7 +107,9 @@ public class AuthService {
                 user.getId(),
                 user.getInstitutionId(),
                 user.getUsername(),
-                user.getRole().name()
+                user.getRole().name(),
+                accessTokenService.issue(user.getId(), user.getUsername(),
+                        user.getRole().name(), user.getInstitutionId())
         );
     }
 }

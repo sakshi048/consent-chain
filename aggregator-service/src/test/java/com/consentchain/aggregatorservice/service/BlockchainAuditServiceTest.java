@@ -48,6 +48,7 @@ class BlockchainAuditServiceTest {
         verify(repository).save(captor.capture());
         BlockchainAuditEvent event = captor.getValue();
         assertEquals(BlockchainConsentEventType.CREATED, event.getEventType());
+        assertNotNull(event.getCanonicalPayload());
         assertTrue(event.getEventKey().matches("0x[0-9a-f]{64}"));
         assertTrue(event.getConsentReference().matches("0x[0-9a-f]{64}"));
         assertTrue(event.getCommitmentHash().matches("0x[0-9a-f]{64}"));
@@ -88,6 +89,49 @@ class BlockchainAuditServiceTest {
         assertEquals(1, proof.size());
         assertTrue(proof.get(0).verifiedOnChain());
         assertEquals("0xtx", proof.get(0).transactionHash());
+    }
+
+    @Test
+    void verifiesUsingEventTimeSnapshotWhenConsentChangesAfterQueueing() {
+        Consent consent = consent();
+        when(repository.existsByEventKey(anyString())).thenReturn(false);
+        service.queueConsentEvent(consent, BlockchainConsentEventType.CREATED);
+        var captor = org.mockito.ArgumentCaptor.forClass(BlockchainAuditEvent.class);
+        verify(repository).save(captor.capture());
+        BlockchainAuditEvent event = captor.getValue();
+        String eventTimeSnapshot = event.getCanonicalPayload();
+        event.markSubmitted("0xtx", LocalDateTime.now());
+
+        consent.setPurpose("Changed after event creation");
+        when(repository.findByConsentIdOrderByCreatedAtAsc(consent.getConsentId())).thenReturn(List.of(event));
+        when(client.isEventRecorded(event.getEventKey())).thenReturn(true);
+        when(client.verifyEvent(event.getEventKey(), event.getEventType(), event.getConsentReference(), event.getCommitmentHash())).thenReturn(true);
+
+        var proof = service.getAudit(consent.getConsentId(), consent);
+
+        assertEquals(eventTimeSnapshot, event.getCanonicalPayload());
+        assertTrue(proof.get(0).verifiedOnChain());
+        verify(client).verifyEvent(event.getEventKey(), event.getEventType(), event.getConsentReference(), event.getCommitmentHash());
+    }
+
+    @Test
+    void legacyEventWithoutSnapshotFallsBackToCurrentConsent() {
+        Consent consent = consent();
+        when(repository.existsByEventKey(anyString())).thenReturn(false);
+        service.queueConsentEvent(consent, BlockchainConsentEventType.CREATED);
+        var captor = org.mockito.ArgumentCaptor.forClass(BlockchainAuditEvent.class);
+        verify(repository).save(captor.capture());
+        BlockchainAuditEvent created = captor.getValue();
+        BlockchainAuditEvent legacy = new BlockchainAuditEvent(created.getConsentId(), created.getEventType(),
+                created.getEventKey(), created.getConsentReference(), created.getCommitmentHash(), created.getCreatedAt());
+        legacy.markSubmitted("0xtx", LocalDateTime.now());
+        when(repository.findByConsentIdOrderByCreatedAtAsc(consent.getConsentId())).thenReturn(List.of(legacy));
+        when(client.isEventRecorded(legacy.getEventKey())).thenReturn(true);
+        when(client.verifyEvent(legacy.getEventKey(), legacy.getEventType(), legacy.getConsentReference(), legacy.getCommitmentHash())).thenReturn(true);
+
+        var proof = service.getAudit(consent.getConsentId(), consent);
+
+        assertTrue(proof.get(0).verifiedOnChain());
     }
 
     @Test

@@ -43,8 +43,10 @@ public class BlockchainAuditService {
         String eventKey = hmac("event|" + consent.getConsentId() + "|" + eventType.name());
         if (eventRepository.existsByEventKey(eventKey)) return;
         String reference = hmac("consent|" + consent.getConsentId());
-        String commitment = hmac(canonicalConsent(consent, eventType, now));
-        eventRepository.save(new BlockchainAuditEvent(consent.getConsentId(), eventType, eventKey, reference, commitment, now));
+        String canonicalPayload = canonicalConsent(consent, eventType, now);
+        String commitment = hmac(canonicalPayload);
+        eventRepository.save(new BlockchainAuditEvent(consent.getConsentId(), eventType, eventKey, reference,
+                commitment, canonicalPayload, now));
     }
 
     @Scheduled(fixedDelayString = "${blockchain.poll-delay-ms:5000}")
@@ -78,7 +80,9 @@ public class BlockchainAuditService {
                 try {
                     boolean localCommitmentMatches = hmac("event|" + consentId + "|" + event.getEventType().name()).equals(event.getEventKey())
                             && hmac("consent|" + consentId).equals(event.getConsentReference())
-                            && hmac(canonicalConsent(consent, event.getEventType(), event.getCreatedAt())).equals(event.getCommitmentHash());
+                            && hmac(event.getCanonicalPayload() != null ? event.getCanonicalPayload()
+                                    : canonicalConsent(consent, event.getEventType(), event.getCreatedAt()))
+                                    .equals(event.getCommitmentHash());
                     boolean eventExists = blockchainClient.isEventRecorded(event.getEventKey());
                     verified = localCommitmentMatches && eventExists && blockchainClient.verifyEvent(event.getEventKey(), event.getEventType(), event.getConsentReference(), event.getCommitmentHash());
                     message = verified ? "Local consent commitment matches the immutable Besu record" : eventExists

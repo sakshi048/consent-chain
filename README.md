@@ -44,7 +44,7 @@ The FIU-to-AA request handoff is made by the caller/client today; no server-side
 | AA | http://localhost:8082 |
 | FIP and FIU (bank-service) | http://localhost:8081 |
 
-Use Content-Type: application/json for JSON bodies. The current AA controllers do not enforce a Bearer token, and AA login does not issue a JWT. FIU routes have no custom API-key check. Protected FIP routes require X-AA-Token set to the same shared value as FIP_AA_API_KEY / BANK_AA_API_KEY. The AA supplies that header on its FIP calls. All statuses below describe successful current controller paths; validation/downstream errors can return 400, 401, 403, or 404.
+Use Content-Type: application/json for JSON bodies. AA registration and login are public; all other `/aa/**` routes require `Authorization: Bearer <accessToken>`. AA login returns a short-lived token. FIU/FIP login is handled by bank-service and also returns a short-lived token that the frontend forwards to aggregator; FIU/FIP tokens cannot carry AA or ADMIN roles. Protected FIP routes still require `X-AA-Token` set to the same shared value as `FIP_AA_API_KEY` / `BANK_AA_API_KEY`; the AA supplies it on server-to-server FIP calls. All statuses below describe successful current controller paths; validation/downstream errors can return 400, 401, 403, or 404.
 
 ### Recommended Postman order
 
@@ -255,8 +255,12 @@ Set service variables in each process environment or IntelliJ Run Configuration.
 | SPRING_DATASOURCE_USERNAME | <YOUR_MYSQL_USERNAME> |
 | SPRING_DATASOURCE_PASSWORD | <YOUR_MYSQL_PASSWORD> |
 | FIP_BASE_URL | http://localhost:8081 |
+| BANK_SERVICE_AUTH_TOKEN | <SHARED_RANDOM_SERVICE_SECRET>; same value in bank-service; aggregator-only use |
 | FIP_AA_API_KEY | <YOUR_SHARED_AA_API_KEY>; must match BANK_AA_API_KEY |
 | FIU_BASE_URL | http://localhost:8081; FiuClientService uses this for FIU result callbacks |
+| AA_AUTH_TOKEN_SECRET | <UNIQUE_RANDOM_SECRET_AT_LEAST_32_CHARACTERS> |
+| INSTITUTION_AUTH_TOKEN_SECRET | <SHARED_RANDOM_SECRET_AT_LEAST_32_CHARACTERS>; same value in bank-service |
+| AA_ADMIN_BOOTSTRAP_USERNAME / AA_ADMIN_BOOTSTRAP_PASSWORD | Optional first-admin bootstrap; both required together |
 
 ### Bank service (FIP + FIU)
 
@@ -266,6 +270,8 @@ Set service variables in each process environment or IntelliJ Run Configuration.
 | SPRING_DATASOURCE_USERNAME | <YOUR_MYSQL_USERNAME> |
 | SPRING_DATASOURCE_PASSWORD | <YOUR_MYSQL_PASSWORD> |
 | BANK_AA_API_KEY | <YOUR_SHARED_AA_API_KEY>; expected X-AA-Token value, same as FIP_AA_API_KEY |
+| BANK_SERVICE_AUTH_TOKEN | <SHARED_RANDOM_SERVICE_SECRET>; same value in aggregator-service; never sent to frontend |
+| INSTITUTION_AUTH_TOKEN_SECRET | <SHARED_RANDOM_SECRET_AT_LEAST_32_CHARACTERS>; same value in aggregator-service |
 
 ### Blockchain (Aggregator / AA only)
 
@@ -291,7 +297,17 @@ The FIU creates a request in bank-service, then the caller sends its requestId a
 
 When executing a request, AA requires CONSENT_APPROVED and calls the FIP only for scopes recorded on the AA request. FIP data service independently checks that its consent artefact exists, is ACTIVE, and is unexpired before returning data. AA saves DATA_RECEIVED and posts the result to the FIU; FIU stores response status and serialized response data. MySQL is the application source of truth. AuditService records AA user/account/consent actions.
 
-Authentication is as implemented: AA register/login routes exist but controllers do not enforce a Bearer/JWT token, and login does not issue one. The FIP API-key filter requires X-AA-Token on protected FIP consent/data routes. FIU endpoints have no custom API key. The API documentation here describes implementation behavior, not a production security recommendation.
+Authentication is enforced at the aggregator boundary using short-lived Bearer tokens. FIU/FIP tokens come from bank-service login and are forwarded by the frontend; protected FIP consent/data calls still use the existing X-AA-Token service credential. FIU endpoints in bank-service remain caller-accessible as documented below.
+
+### Frontend identity and admin bootstrap
+
+Both service processes must be configured with an `INSTITUTION_AUTH_TOKEN_SECRET` of at least 32 characters, with exactly the same value in bank-service and aggregator-service. Aggregator additionally requires its own `AA_AUTH_TOKEN_SECRET` (at least 32 characters); keep it different from the institution secret. These HMAC signing secrets let aggregator verify AA and FIU/FIP login tokens with separate issuers and role allowlists. Login tokens expire after eight hours. The frontend stores the token in session storage and sends it only to aggregator APIs.
+
+To create the first admin, start aggregator once with `AA_ADMIN_BOOTSTRAP_USERNAME` and `AA_ADMIN_BOOTSTRAP_PASSWORD` set. Optional `AA_ADMIN_BOOTSTRAP_EMAIL` and `AA_ADMIN_BOOTSTRAP_NAME` set the profile fields. Aggregator creates a BCrypt-protected ADMIN only when no ADMIN exists; subsequent starts do not change it. Public AA registration always creates USER and cannot set a role. Admin signs in through the AA login form. Never put bootstrap credentials or signing secrets in source control.
+
+Account linking uses `BANK_SERVICE_AUTH_TOKEN` in the `X-Internal-Service-Token` header for aggregator-to-bank verification. Configure the same strong random value only in those two backend processes; it is never sent to the frontend. Plain HTTP is supported for loopback local development. Non-local/deployed aggregator-to-bank traffic must use HTTPS or mTLS. Bank verification checks the selected bank account against the credential-authenticated bank customer, and the aggregator compares that customer's PAN with the authenticated AA user's stored PAN. Legacy plaintext customer passwords are BCrypt-upgraded after a successful verification; no bulk database migration is performed. Linked-account responses omit PAN and nested user records. Full account numbers remain in the authenticated AA response because existing data-retrieval requests use them; the UI masks them visually.
+
+AA users can access only their own account and consent records. FIU request creation resolves the AA user from the request PAN and uses the authenticated FIU institution ID; the supplied `userId` is not used as the identity. FIU can read its own requests, while FIP read access supports the current single-provider demo. Consent decisions and data retrieval are AA-owner-only. `/aa/admin/**` requires a server-validated ADMIN token.
 
 ### Blockchain outbox logic
 
