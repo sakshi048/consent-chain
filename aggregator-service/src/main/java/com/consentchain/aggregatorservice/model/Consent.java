@@ -47,8 +47,7 @@ public class Consent {
 
     private LocalDateTime expiresAt;
 
-    public Consent() {
-    }
+    public Consent() {}
 
     public Long getId() {
         return id;
@@ -110,12 +109,12 @@ public class Consent {
         this.fromDate = fromDate;
     }
 
-    public LocalDate getToDate() {
-        return toDate;
-    }
-
     public void setToDate(LocalDate toDate) {
         this.toDate = toDate;
+    }
+
+    public LocalDate getToDate() {
+        return toDate;
     }
 
     public ConsentStatus getStatus() {

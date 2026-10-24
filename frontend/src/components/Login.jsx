@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     FaUniversity,
     FaEye,
@@ -6,10 +7,12 @@ import {
     FaInfoCircle,
     FaLock,
     FaUser,
+    FaShieldAlt,
 } from "react-icons/fa";
 import { loginStyles } from "../assets/dummyStyles.js";
 
 const Login = () => {
+    const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -184,6 +187,17 @@ const Login = () => {
 
                         </div>
 
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-gray-100 text-center">
+                        <button
+                            type="button"
+                            onClick={() => navigate("/admin")}
+                            className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline transition-colors"
+                        >
+                            <FaShieldAlt className="text-blue-600" />
+                            <span>Go to ConsentChain Admin Dashboard</span>
+                        </button>
                     </div>
 
                 </div>

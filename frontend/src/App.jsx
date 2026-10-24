@@ -4,16 +4,21 @@ import Login from "./components/Login";
 import Signup from "./components/Signup";
 import FipDashboard from "./pages/FipDashboard";
 import FiuDashboard from "./pages/FiuDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/admin" replace />} />
 
         <Route path="/login" element={<Login />} />
 
         <Route path="/signup" element={<Signup />} />
+
+        <Route path="/admin" element={<AdminDashboard />} />
+
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
         <Route path="/fip/dashboard" element={<FipDashboard />} />
 
@@ -21,7 +26,7 @@ function App() {
 
         <Route
           path="*"
-          element={<Navigate to="/login" replace />}
+          element={<Navigate to="/admin" replace />}
         />
       </Routes>
     </BrowserRouter>

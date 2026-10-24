@@ -6,12 +6,19 @@ import java.util.List;
 public class ConsentRequest {
 
     private String requestId;
+
     private Long userId;
+
     private String fiuId;
+
     private String purpose;
+
     private List<String> dataScopes;
+
     private LocalDate fromDate;
+
     private LocalDate toDate;
+
 
     public String getRequestId() {
         return requestId;
@@ -21,6 +28,7 @@ public class ConsentRequest {
         this.requestId = requestId;
     }
 
+
     public Long getUserId() {
         return userId;
     }
@@ -28,6 +36,7 @@ public class ConsentRequest {
     public void setUserId(Long userId) {
         this.userId = userId;
     }
+
 
     public String getFiuId() {
         return fiuId;
@@ -37,6 +46,7 @@ public class ConsentRequest {
         this.fiuId = fiuId;
     }
 
+
     public String getPurpose() {
         return purpose;
     }
@@ -45,27 +55,36 @@ public class ConsentRequest {
         this.purpose = purpose;
     }
 
+
     public List<String> getDataScopes() {
         return dataScopes;
     }
 
-    public void setDataScopes(List<String> dataScopes) {
+    public void setDataScopes(
+            List<String> dataScopes) {
+
         this.dataScopes = dataScopes;
     }
+
 
     public LocalDate getFromDate() {
         return fromDate;
     }
 
-    public void setFromDate(LocalDate fromDate) {
+    public void setFromDate(
+            LocalDate fromDate) {
+
         this.fromDate = fromDate;
     }
+
 
     public LocalDate getToDate() {
         return toDate;
     }
 
-    public void setToDate(LocalDate toDate) {
+    public void setToDate(
+            LocalDate toDate) {
+
         this.toDate = toDate;
     }
 }
