@@ -389,17 +389,11 @@ public class ConsentService {
         return saved;
     }
 
-<<<<<<< HEAD
-
-// blockchain
-    public Consent revoke(
-=======
     // =========================================================
     // REVOKE CONSENT
     // =========================================================
-
+    // blockchain
     public Consent revokeConsent(
->>>>>>> 79b5f8fc1d9765bacc4eb4976ce6d478fbd6ae1f
             String consentId) {
 
         // -----------------------------------------------------

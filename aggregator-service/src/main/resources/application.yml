@@ -5,11 +5,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/aggregator_service_db
     username: root
-<<<<<<< HEAD
     password: Apatil#2704
-=======
-    password: 1234
->>>>>>> 79b5f8fc1d9765bacc4eb4976ce6d478fbd6ae1f
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:

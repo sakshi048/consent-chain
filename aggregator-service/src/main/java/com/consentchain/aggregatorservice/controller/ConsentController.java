@@ -156,16 +156,12 @@ public class ConsentController {
                     .body(e.getMessage());
         }
     }
-<<<<<<< HEAD
-// the endpoints of approve, revoke and reject will be used in blockchain so that all logs will be maintained in blockchain
-=======
 
 
     // =========================================================
     // REVOKE CONSENT
     // =========================================================
-
->>>>>>> 79b5f8fc1d9765bacc4eb4976ce6d478fbd6ae1f
+    // the endpoints of approve, revoke and reject will be used in blockchain so that all logs will be maintained in blockchain
     @PutMapping("/{consentId}/revoke")
     public ResponseEntity<?> revokeConsent(
             @PathVariable String consentId) {
