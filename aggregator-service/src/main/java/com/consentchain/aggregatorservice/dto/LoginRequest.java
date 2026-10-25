@@ -1,11 +1,8 @@
 package com.consentchain.aggregatorservice.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 public class LoginRequest {
 
     private String username;
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     public String getUsername() {

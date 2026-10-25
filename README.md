@@ -1,23 +1,21 @@
 # ConsentChain
 
-A consent-first reference implementation of RBI's Account Aggregator framework for secure, purpose-bound financial data sharing, with a blockchain audit layer.
+A consent-first reference implementation of RBI's Account Aggregator framework for secure, purpose-bound financial data sharing.
 
-**Branch: `frontend-blockchain-backend`** (most complete branch: backend + blockchain + secure auth + integrated frontend)
+**Branch: `feat/admin-dashboard`** (backend + early frontend + admin dashboard UI; no blockchain layer)
 
-## Progress Till Now (on `frontend-blockchain-backend`)
+## Progress Till Now (on `feat/admin-dashboard`)
 
-**Overall system: ~80% complete**
+**Overall system: ~45% complete | Admin dashboard UI: ~70% built, ~30% connected to the real backend**
 
 | Module | Status |
 |---|---|
 | Database design and seed scripts | Done |
 | Bank service (FIP + FIU) | Done |
 | Aggregator service (auth, account linking, consent lifecycle, data requests) | Done |
-| Token-based authentication and access control | Done |
-| Blockchain audit layer (Besu network, smart contract, outbox, audit verification) | Done |
-| Credentials moved to environment variables | Done |
-| Frontend for AA user, FIU and FIP flows (connected to backend) | Done |
-| Automated tests (backend security, blockchain, contract, frontend flows) | Done (partial coverage) |
-| Admin dashboard UI | Not in this branch (built in `feat/admin-dashboard`) |
-| Customer dashboard, branch lookup and account lookup | Not in this branch (built in `feature/frontend-and-setup`) |
+| Frontend login, signup, FIP and FIU dashboards | Done (static / sample data) |
+| Admin dashboard UI (metrics, consent chart, audit logs, health, blockchain sync cards) | Built |
+| Admin dashboard connected to backend | Partial (users, consents, audit logs only; rest is sample data) |
+| Blockchain audit layer | Not in this branch |
+| Token-based authentication and access control | Not in this branch |
 | Deployment | Not started |

@@ -3,8 +3,6 @@ package com.consentchain.aggregatorservice.controller;
 import com.consentchain.aggregatorservice.dto.AaDataRequestCreateRequest;
 import com.consentchain.aggregatorservice.model.AaDataRequest;
 import com.consentchain.aggregatorservice.service.AaDataRequestService;
-import com.consentchain.aggregatorservice.security.AuthenticatedPrincipal;
-import com.consentchain.aggregatorservice.security.ResourceAuthorizationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,15 +12,12 @@ import org.springframework.web.bind.annotation.*;
 public class AaDataRequestController {
 
     private final AaDataRequestService dataRequestService;
-    private final ResourceAuthorizationService authorizationService;
 
     public AaDataRequestController(
-            AaDataRequestService dataRequestService,
-            ResourceAuthorizationService authorizationService) {
+            AaDataRequestService dataRequestService) {
 
         this.dataRequestService =
                 dataRequestService;
-        this.authorizationService = authorizationService;
     }
 
     // =========================================================
@@ -32,14 +27,13 @@ public class AaDataRequestController {
     @PostMapping
     public ResponseEntity<?> createDataRequest(
             @RequestBody
-            AaDataRequestCreateRequest request,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
+            AaDataRequestCreateRequest request) {
 
         try {
 
             AaDataRequest response =
                     dataRequestService
-                            .createDataRequest(request, principal);
+                            .createDataRequest(request);
 
             return ResponseEntity
                     .status(HttpStatus.CREATED)
@@ -59,12 +53,15 @@ public class AaDataRequestController {
 
     @GetMapping("/{requestId}")
     public ResponseEntity<?> getDataRequest(
-            @PathVariable String requestId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
+            @PathVariable String requestId) {
 
-        AaDataRequest response;
         try {
-            response = dataRequestService.getDataRequest(requestId);
+
+            AaDataRequest response =
+                    dataRequestService
+                            .getDataRequest(requestId);
+
+            return ResponseEntity.ok(response);
 
         } catch (RuntimeException e) {
 
@@ -72,7 +69,5 @@ public class AaDataRequestController {
                     .status(HttpStatus.NOT_FOUND)
                     .body(e.getMessage());
         }
-        authorizationService.requireDataRequestRead(response, principal);
-        return ResponseEntity.ok(response);
     }
 }

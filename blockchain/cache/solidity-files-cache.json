@@ -1,0 +1,41 @@
+{
+  "_format": "hh-sol-cache-2",
+  "files": {
+    "D:\\major project\\consent-chain\\blockchain\\contracts\\ConsentAuditRegistry.sol": {
+      "lastModificationDate": 1792918843345,
+      "contentHash": "d411ff78fb67c1d4485c842c0df7aa7e",
+      "sourceName": "contracts/ConsentAuditRegistry.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.24"
+      ],
+      "artifacts": [
+        "ConsentAuditRegistry"
+      ]
+    }
+  }
+}

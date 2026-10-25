@@ -3,9 +3,9 @@ spring:
     name: bank-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:mysql://localhost:3306/consentchain_auth
+    username: root
+    password: Apatil#2704
 
   jpa:
     hibernate:
@@ -15,5 +15,6 @@ spring:
 server:
   port: 8081
 
+
 bank:
-  aa-api-key: ${BANK_AA_API_KEY}
+  aa-api-key: AA-SECRET-123

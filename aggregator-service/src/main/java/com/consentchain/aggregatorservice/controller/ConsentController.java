@@ -3,8 +3,6 @@ package com.consentchain.aggregatorservice.controller;
 import com.consentchain.aggregatorservice.dto.ConsentRequest;
 import com.consentchain.aggregatorservice.model.Consent;
 import com.consentchain.aggregatorservice.service.ConsentService;
-import com.consentchain.aggregatorservice.security.AuthenticatedPrincipal;
-import com.consentchain.aggregatorservice.security.ResourceAuthorizationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,16 +14,13 @@ import java.util.List;
 public class ConsentController {
 
     private final ConsentService consentService;
-    private final ResourceAuthorizationService authorizationService;
 
 
     public ConsentController(
-            ConsentService consentService,
-            ResourceAuthorizationService authorizationService) {
+            ConsentService consentService) {
 
         this.consentService =
                 consentService;
-        this.authorizationService = authorizationService;
     }
 
 
@@ -35,11 +30,7 @@ public class ConsentController {
 
     @PostMapping
     public ResponseEntity<?> createConsent(
-            @RequestBody ConsentRequest request,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireRole(principal, "USER");
-        request.setUserId(principal.userId());
+            @RequestBody ConsentRequest request) {
 
         try {
 
@@ -73,10 +64,7 @@ public class ConsentController {
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserConsents(
-            @PathVariable Long userId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireAccountAccess(userId, principal);
+            @PathVariable Long userId) {
 
         try {
 
@@ -101,17 +89,22 @@ public class ConsentController {
 
     @GetMapping("/{consentId}")
     public ResponseEntity<?> getConsent(
-            @PathVariable String consentId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
+            @PathVariable String consentId) {
 
-        Consent consent;
         try {
-            consent = consentService.getConsent(consentId);
+
+            Consent consent =
+                    consentService
+                            .getConsent(consentId);
+
+            return ResponseEntity.ok(consent);
+
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
         }
-        authorizationService.requireConsentRead(consent, principal);
-        return ResponseEntity.ok(consent);
     }
 
 
@@ -121,10 +114,7 @@ public class ConsentController {
 
     @PutMapping("/{consentId}/approve")
     public ResponseEntity<?> approveConsent(
-            @PathVariable String consentId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireConsentOwner(consentService.getConsent(consentId), principal);
+            @PathVariable String consentId) {
 
         try {
 
@@ -149,10 +139,7 @@ public class ConsentController {
 
     @PutMapping("/{consentId}/reject")
     public ResponseEntity<?> rejectConsent(
-            @PathVariable String consentId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireConsentOwner(consentService.getConsent(consentId), principal);
+            @PathVariable String consentId) {
 
         try {
 
@@ -174,13 +161,10 @@ public class ConsentController {
     // =========================================================
     // REVOKE CONSENT
     // =========================================================
-
+    // the endpoints of approve, revoke and reject will be used in blockchain so that all logs will be maintained in blockchain
     @PutMapping("/{consentId}/revoke")
     public ResponseEntity<?> revokeConsent(
-            @PathVariable String consentId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireConsentOwner(consentService.getConsent(consentId), principal);
+            @PathVariable String consentId) {
 
         try {
 

@@ -6,7 +6,6 @@ import com.consentchain.aggregatorservice.model.Consent;
 import com.consentchain.aggregatorservice.model.DataRequestStatus;
 import com.consentchain.aggregatorservice.repository.AaDataRequestRepository;
 import com.consentchain.aggregatorservice.repository.UserRepository;
-import com.consentchain.aggregatorservice.security.AuthenticatedPrincipal;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -40,8 +39,7 @@ public class AaDataRequestService {
     // =========================================================
 
     public AaDataRequest createDataRequest(
-            AaDataRequestCreateRequest request,
-            AuthenticatedPrincipal principal) {
+            AaDataRequestCreateRequest request) {
 
         if (request.getRequestId() == null ||
                 request.getRequestId().isBlank()) {
@@ -50,34 +48,14 @@ public class AaDataRequestService {
                     "Request ID is required");
         }
 
-        String pan = normalizePan(request.getCustomerPan());
-        if (pan == null) {
-            throw new RuntimeException("Customer PAN is required to resolve the AA user");
+        if (request.getUserId() == null) {
+
+            throw new RuntimeException(
+                    "User ID is required");
         }
 
-        Long ownerUserId;
-        String fiuId;
-        if (principal.hasRole("FIU")) {
-            if (principal.institutionId() == null || principal.institutionId().isBlank()) {
-                throw new RuntimeException("Authenticated FIU institution is missing");
-            }
-            ownerUserId = userRepository.findByPanNumber(pan)
-                    .orElseThrow(() -> new RuntimeException("No AA user matches the requested customer PAN"))
-                    .getId();
-            fiuId = principal.institutionId();
-        } else if (principal.hasRole("USER")) {
-            var owner = userRepository.findById(principal.userId())
-                    .orElseThrow(() -> new RuntimeException("AA user not found"));
-            if (!pan.equals(normalizePan(owner.getPanNumber()))) {
-                throw new RuntimeException("Customer PAN does not match the authenticated AA user");
-            }
-            ownerUserId = owner.getId();
-            fiuId = request.getFiuId();
-        } else {
-            throw new RuntimeException("Only an AA user or FIU can create a data request");
-        }
-
-        if (fiuId == null || fiuId.isBlank()) {
+        if (request.getFiuId() == null ||
+                request.getFiuId().isBlank()) {
 
             throw new RuntimeException(
                     "FIU ID is required");
@@ -119,12 +97,19 @@ public class AaDataRequestService {
                     "Data request already exists");
         }
 
+        if (!userRepository.existsById(
+                request.getUserId())) {
+
+            throw new RuntimeException(
+                    "AA user not found");
+        }
+
         // Create consent using existing service
         Consent consent =
                 consentService.createConsent(
                         request.getRequestId(),
-                        ownerUserId,
-                        fiuId,
+                        request.getUserId(),
+                        request.getFiuId(),
                         request.getPurpose(),
                         request.getDataScopes(),
                         request.getFromDate(),
@@ -138,10 +123,10 @@ public class AaDataRequestService {
                 request.getRequestId());
 
         dataRequest.setUserId(
-                ownerUserId);
+                request.getUserId());
 
         dataRequest.setFiuId(
-                fiuId);
+                request.getFiuId());
 
         dataRequest.setPurpose(
                 request.getPurpose());
@@ -185,9 +170,5 @@ public class AaDataRequestService {
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Data request not found"));
-    }
-
-    private String normalizePan(String pan) {
-        return pan == null || pan.isBlank() ? null : pan.trim().toUpperCase(java.util.Locale.ROOT);
     }
 }

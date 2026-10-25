@@ -1,9 +1,6 @@
 package com.consentchain.aggregatorservice.controller;
 
 import com.consentchain.aggregatorservice.service.FipDataService;
-import com.consentchain.aggregatorservice.service.ConsentService;
-import com.consentchain.aggregatorservice.security.AuthenticatedPrincipal;
-import com.consentchain.aggregatorservice.security.ResourceAuthorizationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,17 +10,11 @@ import org.springframework.web.bind.annotation.*;
 public class FipDataController {
 
     private final FipDataService fipDataService;
-    private final ConsentService consentService;
-    private final ResourceAuthorizationService authorizationService;
 
     public FipDataController(
-            FipDataService fipDataService,
-            ConsentService consentService,
-            ResourceAuthorizationService authorizationService) {
+            FipDataService fipDataService) {
 
         this.fipDataService = fipDataService;
-        this.consentService = consentService;
-        this.authorizationService = authorizationService;
     }
 
     // =========================================================
@@ -33,10 +24,7 @@ public class FipDataController {
     @PostMapping("/account")
     public ResponseEntity<?> fetchAccountData(
             @RequestParam String accountNumber,
-            @RequestParam String consentId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireConsentOwner(consentService.getConsent(consentId), principal);
+            @RequestParam String consentId) {
 
         try {
 
@@ -67,10 +55,7 @@ public class FipDataController {
             @RequestParam(required = false)
             String fromDate,
             @RequestParam(required = false)
-            String toDate,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireConsentOwner(consentService.getConsent(consentId), principal);
+            String toDate) {
 
         try {
 
@@ -99,10 +84,7 @@ public class FipDataController {
     @PostMapping("/loans")
     public ResponseEntity<?> fetchLoans(
             @RequestParam String accountNumber,
-            @RequestParam String consentId,
-            @RequestAttribute(AuthenticatedPrincipal.REQUEST_ATTRIBUTE) AuthenticatedPrincipal principal) {
-
-        authorizationService.requireConsentOwner(consentService.getConsent(consentId), principal);
+            @RequestParam String consentId) {
 
         try {
 
