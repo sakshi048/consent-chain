@@ -46,7 +46,7 @@ const Signup = () => {
                         <FaUniversity className={signupStyles.logoIcon} />
                     </div>
 
-                    <h1 className={signupStyles.title}>HDFC BANK</h1>
+                    <h1 className={signupStyles.title}>Signup</h1>
 
                     <p className={signupStyles.subtitle}>FIP Portal</p>
 
