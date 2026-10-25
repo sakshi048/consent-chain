@@ -48,7 +48,7 @@ const Login = () => {
                     </div>
 
                     <h1 className={loginStyles.title}>
-                        HDFC BANK
+                        Login
                     </h1>
 
                     <p className={loginStyles.subtitle}>
